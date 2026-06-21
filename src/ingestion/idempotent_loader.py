@@ -298,3 +298,50 @@ def build_ingestion_summary(spark: SparkSession, config: IngestionConfig | None 
         rows,
         ["source_file", "bronze_table", "record_count", "column_count", "status"],
     )
+
+
+def build_run_report(
+    spark: SparkSession,
+    *,
+    config: IngestionConfig,
+    first_run_id: str,
+    first_results: list[IngestionResult],
+    second_run_id: str,
+    second_results: list[IngestionResult],
+) -> dict:
+    """Compact JSON-serializable report for local sync or copy-paste."""
+    summary_rows = build_ingestion_summary(spark, config).collect()
+    top_records = max(summary_rows, key=lambda r: r.record_count)
+    top_columns = max(summary_rows, key=lambda r: r.column_count)
+
+    return {
+        "landing_path": config.landing_path,
+        "metadata_table": config.metadata_table,
+        "first_run_id": first_run_id,
+        "first_run": [r.__dict__ for r in first_results],
+        "second_run_id": second_run_id,
+        "second_run": [r.__dict__ for r in second_results],
+        "idempotency": {
+            "files_skipped": sum(1 for r in second_results if r.status == "SKIPPED"),
+            "new_records_on_second_run": sum(r.records_ingested for r in second_results),
+        },
+        "summary": [row.asDict() for row in summary_rows],
+        "highlights": {
+            "most_records_table": top_records.bronze_table,
+            "most_records_count": top_records.record_count,
+            "most_columns_table": top_columns.bronze_table,
+            "most_columns_count": top_columns.column_count,
+        },
+    }
+
+
+def write_run_report(report: dict, output_path: str) -> str:
+    """Write report JSON to repo (Databricks Repos) or local path."""
+    import json
+    from pathlib import Path
+
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        json.dump(report, fh, indent=2)
+    return str(path)
