@@ -9,6 +9,10 @@ ecommerce-analytics/
 ├── README.md
 ├── config/
 │   └── catalog_setup.sql    # Unity Catalog setup (run in Databricks)
+├── notebooks/
+│   └── m01_bronze/          # Bronze layer notebooks
+├── src/
+│   └── ingestion/           # Reusable ingestion modules
 └── data/
     ├── raw/                 # Source files (not committed)
     └── extracted/           # Extracted CSVs (not committed)
@@ -48,7 +52,7 @@ The `data/` directory is gitignored. Upload the CSVs to Databricks after running
 2. Clone this repo into **Databricks Repos**.
 3. Run `config/catalog_setup.sql` in the SQL editor to create the `globalmart` catalog, schemas (`bronze`, `silver`, `gold`, `metadata`), and the `raw_landing` volume.
 4. Upload the 8 CSV files to `globalmart.bronze.raw_landing` via Catalog Explorer.
-5. Begin bronze-layer ingestion in `notebooks/m01_bronze/` (added in the next phase).
+5. Run `notebooks/m01_bronze/01_idempotent_ingestion.ipynb` to load bronze tables.
 
 ## Architecture
 
