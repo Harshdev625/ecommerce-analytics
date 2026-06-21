@@ -335,13 +335,28 @@ def build_run_report(
     }
 
 
-def write_run_report(report: dict, output_path: str) -> str:
-    """Write report JSON to repo (Databricks Repos) or local path."""
+def _workspace_path(path: str) -> str:
+    """Databricks Repos imports use /Repos/...; file I/O needs /Workspace/Repos/..."""
+    if path.startswith("/Repos/"):
+        return f"/Workspace{path}"
+    return path
+
+
+def write_run_report(report: dict, output_path: str, dbutils=None) -> str:
+    """Write report JSON to repo path, Databricks Workspace, or local disk."""
     import json
     from pathlib import Path
 
-    path = Path(output_path)
+    payload = json.dumps(report, indent=2)
+    resolved = _workspace_path(output_path)
+
+    if dbutils is not None:
+        parent = "/".join(resolved.split("/")[:-1])
+        dbutils.fs.mkdirs(f"file:{parent}")
+        dbutils.fs.put(f"file:{resolved}", payload, True)
+        return resolved
+
+    path = Path(resolved)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as fh:
-        json.dump(report, fh, indent=2)
+    path.write_text(payload, encoding="utf-8")
     return str(path)
