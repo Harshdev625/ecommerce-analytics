@@ -1,0 +1,28 @@
+# Python / notebooks (added later)
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+*.dbc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Dataset — never commit
+data/raw/*
+!data/raw/.gitkeep
+data/extracted/*
+!data/extracted/.gitkeep
+*.csv
+*.parquet
+*.delta
+*.zip
+
+# Secrets
+.env
+*.token
+
+# Personal — local only
+Project.md
+PROGRESS.md
