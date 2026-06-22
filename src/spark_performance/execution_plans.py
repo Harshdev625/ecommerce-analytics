@@ -10,9 +10,6 @@ from dataclasses import dataclass
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-DEFAULT_BROADCAST_THRESHOLD = "10485760"
-
-
 @dataclass
 class SilverTableRefs:
     order_items: str = "globalmart.silver.order_items"
@@ -102,29 +99,22 @@ def predicate_before_join_good(spark: SparkSession, tables: SilverTableRefs | No
 def join_without_broadcast_bad(
     spark: SparkSession,
     tables: SilverTableRefs | None = None,
-    broadcast_threshold: str = "-1",
 ) -> DataFrame:
-    """Force sort-merge join by disabling auto-broadcast."""
+    """Force sort-merge join via hint (no spark.conf — blocked on Databricks Free)."""
     tables = tables or SilverTableRefs()
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", broadcast_threshold)
     items = spark.table(tables.order_items)
-    sellers = spark.table(tables.sellers)
+    sellers = spark.table(tables.sellers).hint("merge")
     return items.join(sellers, "seller_id").select("order_id", "seller_state", "line_total_value")
 
 
 def join_with_broadcast_good(spark: SparkSession, tables: SilverTableRefs | None = None) -> DataFrame:
     """Broadcast the small sellers dimension."""
     tables = tables or SilverTableRefs()
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", DEFAULT_BROADCAST_THRESHOLD)
     items = spark.table(tables.order_items)
     sellers = spark.table(tables.sellers)
     return items.join(F.broadcast(sellers), "seller_id").select(
         "order_id", "seller_state", "line_total_value"
     )
-
-
-def restore_broadcast_defaults(spark: SparkSession) -> None:
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", DEFAULT_BROADCAST_THRESHOLD)
 
 
 # --- Anti-pattern 3: unnecessary shuffle from repartition ---
@@ -168,7 +158,6 @@ def run_all_comparisons(spark: SparkSession, tables: SilverTableRefs | None = No
         join_with_broadcast_good(spark, tables),
         "wrong_join_strategy",
     )
-    restore_broadcast_defaults(spark)
     results.append(finalize_comparison(r2))
 
     r3 = run_pattern_comparison(
