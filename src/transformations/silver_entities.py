@@ -32,7 +32,11 @@ def build_silver_order_items(spark: SparkSession, config: SilverEntitiesConfig |
         .withColumn("freight_value", F.coalesce(F.col("freight_value").cast("double"), F.lit(0.0)))
         .withColumn("line_total_value", F.col("price") + F.col("freight_value"))
         .join(products.select("product_id", "product_category_name"), on="product_id", how="left")
-        .join(translation, on="product_category_name", how="left")
+        .join(
+            translation.select("product_category_name", "product_category_name_english"),
+            on="product_category_name",
+            how="left",
+        )
         .withColumn(
             "category_name_en",
             F.coalesce(F.col("product_category_name_english"), F.lit("unknown")),
