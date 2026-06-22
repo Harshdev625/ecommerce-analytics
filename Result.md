@@ -172,7 +172,7 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 
 ### Gold
 
-`dim_date`, `daily_sales_metrics`, `customer_rfm`, `category_growth_streaks`, `customer_summary`
+`dim_date`, `dim_product`, `daily_sales_metrics`, `customer_rfm`, `category_growth_streaks`, `customer_summary`
 
 ### Metadata
 
@@ -211,6 +211,7 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 | `gold_incremental_loader.json` | Incremental loader watermarks |
 | `dimensional_date_dim.json` | Date dimension |
 | `dimensional_surrogate_keys.json` | Surrogate key strategy tests |
+| `dimensional_product.json` | Product dimension SCD Type 1 |
 
 ---
 
@@ -379,13 +380,25 @@ Uses `date_key` (YYYYMMDD integer) as the primary key — no separate surrogate 
 
 Note: `monotonically_increasing_id()` can look stable in a same-session micro-benchmark but shifts when partition layout changes — unsuitable for SCD Type 1 reloads.
 
+### Product dimension (SCD Type 1)
+
+**Report:** `dimensional_product.json` · **Table:** `globalmart.gold.dim_product`
+
+| Metric | Value |
+|--------|-------|
+| Products | **32,951** (distinct) |
+| SK strategy | Deterministic hash |
+| Category conformance | **PASSED** — 0 orphan English categories, 0 multi-map PT→EN |
+
+Olist bronze typos (`product_name_lenght`, `product_description_lenght`) normalized to canonical column names in the dimension.
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Product/seller/customer dims, fact table, star query |
+| **Dimensional model** | Seller/customer dims, fact table, star query |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |
