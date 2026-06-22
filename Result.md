@@ -172,7 +172,7 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 
 ### Gold
 
-`daily_sales_metrics`, `customer_rfm`, `category_growth_streaks`, `customer_summary`
+`dim_date`, `daily_sales_metrics`, `customer_rfm`, `category_growth_streaks`, `customer_summary`
 
 ### Metadata
 
@@ -209,6 +209,8 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 | `gold_category_growth.json` | Category growth streaks |
 | `gold_customer_summary.json` | Customer summary MERGE |
 | `gold_incremental_loader.json` | Incremental loader watermarks |
+| `dimensional_date_dim.json` | Date dimension |
+| `dimensional_surrogate_keys.json` | Surrogate key strategy tests |
 
 ---
 
@@ -347,11 +349,28 @@ Run 2 re-reads rows within the 24-hour lookback window (99,441) but advances the
 
 ---
 
+## Dimensional model
+
+### Date dimension
+
+**Report:** `dimensional_date_dim.json` · **Table:** `globalmart.gold.dim_date`
+
+| Metric | Value |
+|--------|-------|
+| Date range | 2016-01-01 → 2020-12-31 |
+| Row count | **1,827** (matches expected) |
+| Weekend days | **522** |
+| Fiscal year start | **April 1** (`fiscal_month=1`, `fiscal_quarter=1` on each Apr 1) |
+
+Uses `date_key` (YYYYMMDD integer) as the primary key — no separate surrogate needed.
+
+---
+
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Star schema — dims + fact table |
+| **Dimensional model** | Product/seller/customer dims, fact table, star query |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |

@@ -117,6 +117,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | Notebook | Purpose |
 |----------|---------|
 | `01_date_dimension.ipynb` | Calendar + fiscal date dimension (2016–2020) |
+| `02_surrogate_key_strategy.ipynb` | Monotonic vs hash SK stability on sellers |
 
 ---
 
