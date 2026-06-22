@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze through Gold analytics done · Dimensional model in progress (fact validated; star query pending run)  
+**Pipeline status:** Bronze through **Dimensional model (M7) complete** · Next: Delta ops  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -137,7 +137,7 @@ Bronze (raw) → Silver (quality & entities) → Gold (analytics) → Dimensiona
 | **Bronze** | 8 source tables, Auto Loader orders, nested/flat payments, evolved orders |
 | **Silver** | Orders, late arrivals, order items, customers, sellers, incremental orders |
 | **Gold** | Daily sales, customer RFM, category growth streaks, customer summary |
-| **Dimensional** | `dim_date`, `dim_product`, `dim_seller`, `dim_customer`, `fact_sales` (110,197 rows, validated) |
+| **Dimensional** | Full star schema — 5 dims + `fact_sales` (110,197 rows) + analytics query (1,298 groups) |
 | **Metadata** | Ingestion log, DQ results, DLQ, reconciliation log, schema violations, pipeline watermarks, category conformance |
 
 JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
@@ -148,7 +148,6 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Run star schema query notebook (`07`) |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models on Databricks |
 | **Orchestration** | Databricks Workflows, Airflow, unit tests, dashboard |

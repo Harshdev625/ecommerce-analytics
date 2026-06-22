@@ -432,13 +432,35 @@ Sample customer `000419c5494106c306a97b5635748086`: **v1 closed** (`Niteroi (CDC
 
 Dimension prep at run time: 0 orphan customers/products (dim already complete after prior merge or notebook 05 rebuild).
 
+### Star schema query
+
+**Report:** `dimensional_star_schema_query.json` · **Query:** fact ⋈ all four dimensions
+
+| Filter | Value |
+|--------|-------|
+| Year | **2018** |
+| States | **SP**, **RJ**, **MG** |
+| Customers | Current versions only (`is_current = true`) |
+| Summary groups | **1,298** (month × state × category) |
+
+**Top 5 by revenue:**
+
+| Rank | Period | State | Category | Orders | Items | Revenue (R$) | Avg delivery (days) | Late % |
+|------|--------|-------|----------|--------|-------|--------------|---------------------|--------|
+| 1 | 2018-08 | SP | health_beauty | 370 | 409 | 55,387.86 | 3.23 | 18.09 |
+| 2 | 2018-05 | SP | watches_gifts | 231 | 248 | 50,062.63 | 5.90 | 6.45 |
+| 3 | 2018-05 | SP | health_beauty | 342 | 384 | 47,596.41 | 5.25 | 8.07 |
+| 4 | 2018-06 | SP | health_beauty | 366 | 421 | 47,308.26 | 3.79 | 0.95 |
+| 5 | 2018-02 | SP | computers_accessories | 309 | 375 | 45,193.76 | 8.83 | 9.60 |
+
+All **top 20** rows are **São Paulo (SP)**; leading categories include **health_beauty**, **watches_gifts**, **bed_bath_table**, and **computers_accessories**.
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Star schema query (`07_star_schema_query.ipynb`) |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |
