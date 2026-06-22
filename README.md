@@ -10,9 +10,12 @@ ecommerce-analytics/
 ├── config/
 │   └── catalog_setup.sql    # Unity Catalog setup (run in Databricks)
 ├── notebooks/
-│   └── m01_bronze/          # Bronze layer notebooks
+│   ├── m01_bronze/          # Bronze layer (complete)
+│   └── m03_silver_quality/  # Silver layer
 ├── src/
-│   └── ingestion/           # Reusable ingestion modules
+│   ├── ingestion/
+│   ├── quality/
+│   └── transformations/
 └── data/
     ├── raw/                 # Source files (not committed)
     └── extracted/           # Extracted CSVs (not committed)
@@ -62,6 +65,15 @@ The `data/` directory is gitignored. Upload the CSVs to Databricks after running
 | `02_auto_loader_orders.ipynb` | Auto Loader for orders with checkpoint idempotency |
 | `03_nested_payments.ipynb` | Nested + flattened payment representations |
 | `04_schema_evolution.ipynb` | Orders schema evolution + validation log |
+
+## Silver notebooks
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_data_quality_dlq.ipynb` | DQ engine + dead letter queue |
+| `02_silver_orders.ipynb` | Silver orders + reconciliation |
+| `03_silver_order_items.ipynb` | Silver order items + price DLQ |
+| `04_silver_customers_sellers.ipynb` | Silver customers and sellers |
 
 ## Architecture
 
