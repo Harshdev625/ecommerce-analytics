@@ -199,6 +199,9 @@ Not built yet.
 | `m02_task21_execution_plans.json` | Execution plans |
 | `m02_task22_skew.json` | Skew remediation |
 | `m02_task23_higher_order.json` | Higher-order functions |
+| `joins_business_questions.json` | Business join questions |
+| `joins_broadcast_control.json` | Broadcast join control |
+| `joins_skew_distribution.json` | Skew distribution report |
 
 ---
 
@@ -212,11 +215,50 @@ Not built yet.
 
 ---
 
+## Joins & CDC
+
+### Business join questions
+
+**Report:** `joins_business_questions.json`
+
+| # | Question | Join | Result |
+|---|----------|------|--------|
+| 1 | Orders with no matching customer | `left_anti` | **0** |
+| 2 | Sellers who never sold | `left_anti` | **0** |
+| 3 | Top 10 delivered orders by value | `inner` | See report (top: R$13,664 — Rio de Janeiro, 8 items) |
+| 4 | Customers in main + late arrivals | `inner` | **99,441** (late arrivals not empty) |
+
+### Broadcast join control
+
+**Report:** `joins_broadcast_control.json`  
+**Pair:** `order_items` (~112k) ⋈ `sellers` (~3k)
+
+| Variant | Strategy | Time (ms) | vs default |
+|---------|----------|-----------|------------|
+| Spark default | `broadcast_hash_join` | **599** | — |
+| `hint("merge")` | `sort_merge_join` | 815 | 0.74× (slower) |
+| `broadcast(sellers)` | `broadcast_hash_join` | 773 | 0.78× |
+
+All plans include a shuffle on the sellers scan before broadcast — typical on Photon for small dimension tables.
+
+### Skew distribution report
+
+**Report:** `joins_skew_distribution.json` · **112,650** order items · threshold **3.0×**
+
+| Column | Hottest key (prefix) | Count | Skew factor |
+|--------|----------------------|-------|-------------|
+| `seller_id` | `6560211a…` | 2,033 | **55.86×** |
+| `product_id` | `aca2eb7d…` | 527 | **154.15×** |
+
+All top-10 keys flagged `is_skewed: true` for both columns.
+
+---
+
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Joins & CDC** | Business join queries, broadcast control, customer MERGE |
+| **Joins & CDC** | Customer MERGE (CDC simulation) |
 | **Gold analytics** | Daily sales, RFM, seller performance, aggregations |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |

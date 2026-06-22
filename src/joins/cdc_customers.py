@@ -12,6 +12,7 @@ from pyspark.sql.window import Window
 from src.joins.business_questions import SilverJoinTables
 
 CDC_OPERATION_COL = "cdc_operation"
+MUTABLE_COLS = ("customer_city", "customer_state", "customer_zip_code_prefix")
 
 
 @dataclass
@@ -25,6 +26,19 @@ class CdcBatchCounts:
         return self.inserts + self.updates + self.deletes
 
 
+def _data_columns(table_columns: list[str]) -> list[str]:
+    """Target data columns (exclude metadata and CDC flag)."""
+    return [c for c in table_columns if c not in ("processed_at", CDC_OPERATION_COL)]
+
+
+def _with_null_columns(df: DataFrame, columns: list[str]) -> DataFrame:
+    out = df
+    for col in columns:
+        if col not in out.columns:
+            out = out.withColumn(col, F.lit(None).cast("string"))
+    return out
+
+
 def generate_cdc_batch(
     spark: SparkSession,
     customers_table: str,
@@ -33,7 +47,12 @@ def generate_cdc_batch(
     """Build a CDC source batch: inserts, updates, and deletes (18 rows default)."""
     counts = counts or CdcBatchCounts()
     customers = spark.table(customers_table)
-    ranked = customers.withColumn("_rn", F.row_number().over(Window.orderBy("customer_id")))
+    data_cols = _data_columns(customers.columns)
+
+    ranked = customers.withColumn(
+        "_rn",
+        F.row_number().over(Window.partitionBy(F.lit(1)).orderBy("customer_id")),
+    )
 
     update_src = (
         ranked.filter((F.col("_rn") > counts.deletes) & (F.col("_rn") <= counts.deletes + counts.updates))
@@ -45,32 +64,32 @@ def generate_cdc_batch(
     delete_src = (
         ranked.filter(F.col("_rn") <= counts.deletes)
         .select("customer_id")
+        .transform(lambda df: _with_null_columns(df, [c for c in data_cols if c != "customer_id"]))
         .withColumn(CDC_OPERATION_COL, F.lit("delete"))
-        .withColumn("customer_city", F.lit(None).cast("string"))
-        .withColumn("customer_state", F.lit(None).cast("string"))
-        .withColumn("customer_zip_code_prefix", F.lit(None).cast("string"))
     )
 
-    insert_rows = []
+    insert_rows: list[dict] = []
     for i in range(counts.inserts):
-        row = {
-            "customer_id": f"cdc-insert-{uuid.uuid4().hex[:12]}",
-            "customer_zip_code_prefix": f"{10000 + i}",
-            "customer_city": f"Cdc City {i}",
-            "customer_state": "SP",
-            CDC_OPERATION_COL: "insert",
-        }
-        if "customer_unique_id" in customers.columns:
-            row["customer_unique_id"] = f"cdc-unique-{i:03d}"
+        row = {CDC_OPERATION_COL: "insert"}
+        for col in data_cols:
+            if col == "customer_id":
+                row[col] = f"cdc-insert-{uuid.uuid4().hex[:12]}"
+            elif col == "customer_zip_code_prefix":
+                row[col] = f"{10000 + i}"
+            elif col == "customer_city":
+                row[col] = f"Cdc City {i}"
+            elif col == "customer_state":
+                row[col] = "SP"
+            else:
+                row[col] = f"cdc-{col}-{i}"
         insert_rows.append(row)
 
     insert_src = spark.createDataFrame(insert_rows)
 
-    target_cols = [c for c in customers.columns if c != "processed_at"]
     batch = (
-        update_src.select(*target_cols, CDC_OPERATION_COL)
-        .unionByName(delete_src.select(*target_cols, CDC_OPERATION_COL), allowMissingColumns=True)
-        .unionByName(insert_src.select(*target_cols, CDC_OPERATION_COL), allowMissingColumns=True)
+        update_src.select(*data_cols, CDC_OPERATION_COL)
+        .unionByName(delete_src.select(*data_cols, CDC_OPERATION_COL))
+        .unionByName(insert_src.select(*data_cols, CDC_OPERATION_COL))
     )
 
     meta = {
@@ -78,6 +97,7 @@ def generate_cdc_batch(
         "inserts": counts.inserts,
         "updates": counts.updates,
         "deletes": counts.deletes,
+        "data_columns": data_cols,
         "update_ids": [r["customer_id"] for r in update_src.select("customer_id").collect()],
         "delete_ids": [r["customer_id"] for r in delete_src.select("customer_id").collect()],
         "insert_ids": [r["customer_id"] for r in insert_src.select("customer_id").collect()],
@@ -85,23 +105,26 @@ def generate_cdc_batch(
     return batch, meta
 
 
-def merge_sql_template(target_table: str) -> str:
+def merge_sql_template(target_table: str, data_cols: list[str] | None = None) -> str:
+    cols = data_cols or ["customer_id", "customer_zip_code_prefix", "customer_city", "customer_state"]
+    update_sets = ",\n  ".join(
+        f"t.{c} = s.{c}" for c in cols if c in MUTABLE_COLS
+    )
+    insert_col_list = ", ".join(cols + ["processed_at"])
+    insert_val_list = ", ".join(f"s.{c}" for c in cols) + ", current_timestamp()"
+
     return f"""
 MERGE INTO {target_table} AS t
 USING cdc_batch AS s
 ON t.customer_id = s.customer_id
 WHEN MATCHED AND s.cdc_operation = 'delete' THEN DELETE
 WHEN MATCHED AND s.cdc_operation = 'update' THEN UPDATE SET
-  t.customer_city = s.customer_city,
-  t.customer_state = s.customer_state,
-  t.customer_zip_code_prefix = s.customer_zip_code_prefix,
+  {update_sets},
   t.processed_at = current_timestamp()
 WHEN NOT MATCHED AND s.cdc_operation = 'insert' THEN INSERT (
-  customer_id, customer_unique_id, customer_zip_code_prefix,
-  customer_city, customer_state, processed_at
+  {insert_col_list}
 ) VALUES (
-  s.customer_id, s.customer_unique_id, s.customer_zip_code_prefix,
-  s.customer_city, s.customer_state, current_timestamp()
+  {insert_val_list}
 )
 """.strip()
 
@@ -113,7 +136,13 @@ def apply_customer_cdc_merge(
 ) -> None:
     from delta.tables import DeltaTable
 
-    cdc_batch.createOrReplaceTempView("cdc_batch")
+    data_cols = _data_columns(spark.table(customers_table).columns)
+    update_set = {c: f"s.{c}" for c in data_cols if c in MUTABLE_COLS}
+    update_set["processed_at"] = "current_timestamp()"
+
+    insert_values = {c: f"s.{c}" for c in data_cols}
+    insert_values["processed_at"] = "current_timestamp()"
+
     DeltaTable.forName(spark, customers_table).alias("t").merge(
         cdc_batch.alias("s"),
         "t.customer_id = s.customer_id",
@@ -121,22 +150,10 @@ def apply_customer_cdc_merge(
         condition=f"s.{CDC_OPERATION_COL} = 'delete'"
     ).whenMatchedUpdate(
         condition=f"s.{CDC_OPERATION_COL} = 'update'",
-        set={
-            "customer_city": "s.customer_city",
-            "customer_state": "s.customer_state",
-            "customer_zip_code_prefix": "s.customer_zip_code_prefix",
-            "processed_at": "current_timestamp()",
-        },
+        set=update_set,
     ).whenNotMatchedInsert(
         condition=f"s.{CDC_OPERATION_COL} = 'insert'",
-        values={
-            "customer_id": "s.customer_id",
-            "customer_unique_id": "s.customer_unique_id",
-            "customer_zip_code_prefix": "s.customer_zip_code_prefix",
-            "customer_city": "s.customer_city",
-            "customer_state": "s.customer_state",
-            "processed_at": "current_timestamp()",
-        },
+        values=insert_values,
     ).execute()
 
 
@@ -203,6 +220,6 @@ def run_customer_cdc_simulation(
             "updates": meta["updates"],
             "deletes": meta["deletes"],
         },
-        "merge_sql": merge_sql_template(tables.customers),
+        "merge_sql": merge_sql_template(tables.customers, meta["data_columns"]),
         "verification": verification,
     }
