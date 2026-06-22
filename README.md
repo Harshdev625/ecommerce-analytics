@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze through **Dimensional model (M7) complete** · Next: Delta ops  
+**Pipeline status:** Dimensional model done · Delta ops notebooks ready (run on Databricks)  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -21,7 +21,8 @@ ecommerce-analytics/
 │   ├── m02_spark_performance/   # Query plan & skew analysis
 │   ├── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
 │   ├── m05_gold_analytics/      # Gold aggregations and analytics
-│   └── m06_dimensional/         # Star schema dimensions and fact table
+│   ├── m06_dimensional/         # Star schema dimensions and fact table
+│   └── m07_delta_ops/           # Delta OPTIMIZE, partition, VACUUM, time travel
 ├── src/
 │   ├── ingestion/
 │   ├── quality/
@@ -29,7 +30,8 @@ ecommerce-analytics/
 │   ├── spark_performance/
 │   ├── joins/
 │   ├── gold/
-│   └── dimensional/
+│   ├── dimensional/
+│   └── delta_ops/
 └── data/
     ├── raw/
     └── extracted/
@@ -124,6 +126,16 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `06_fact_sales.ipynb` | Fact table for delivered order items + dimension prep + validations |
 | `07_star_schema_query.ipynb` | Multi-dim join — top 20 revenue groups by month, state, category |
 
+### Delta operations — `notebooks/m07_delta_ops/`
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_small_files_optimize.ipynb` | Fragment fact into 100 partitions → OPTIMIZE |
+| `02_partition_zorder.ipynb` | Partition by `order_year_month` + Z-ORDER |
+| `03_vacuum.ipynb` | VACUUM dry run + execute, history |
+| `04_time_travel.ipynb` | VERSION AS OF query + RESTORE |
+| `05_liquid_clustering.ipynb` | Liquid CLUSTER BY vs partitioned table |
+
 ---
 
 ## Architecture
@@ -148,6 +160,6 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
+| **Delta ops** | Run `m07_delta_ops/` notebooks 01–05 on Databricks |
 | **dbt** | Staging and mart models on Databricks |
 | **Orchestration** | Databricks Workflows, Airflow, unit tests, dashboard |
