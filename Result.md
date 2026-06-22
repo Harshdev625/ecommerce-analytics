@@ -423,18 +423,14 @@ Sample customer `000419c5494106c306a97b5635748086`: **v1 closed** (`Niteroi (CDC
 
 | Metric | Value |
 |--------|-------|
-| Fact rows | **110,191** (expected **110,197**) |
-| Total revenue | **R$15,419,038.02** (expected **R$15,419,773.75**) |
+| Fact rows | **110,197** |
+| Total revenue | **R$15,419,773.75** |
 | FK nulls | **0** on all four dimensions |
-| Join gap | **6** delivered line items — `customer_id` absent from `dim_customer` (orphan orders vs `silver.customers`) |
+| Row count match | **PASSED** (vs delivered silver order items) |
+| Revenue match | **PASSED** |
+| All validations | **PASSED** |
 
-Fix applied in `src/dimensional/`:
-
-- `ensure_delivered_order_customers_in_dim()` — merges **6 orphan** delivered-order `customer_id`s into `dim_customer` before fact build
-- `build_initial_customer_dimension()` — unions the same stubs on full dim rebuild (notebook 05)
-- `prepare_dimensions_for_fact()` — orphan customer merge → current-flag repair → orphan product merge
-
-**Re-run `06_fact_sales.ipynb`** after Pull; expect **110,197** rows and `all_validations_passed: true`.
+Dimension prep at run time: 0 orphan customers/products (dim already complete after prior merge or notebook 05 rebuild).
 
 ---
 
@@ -442,7 +438,7 @@ Fix applied in `src/dimensional/`:
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Fact sales re-run (orphan customer merge), star schema query |
+| **Dimensional model** | Star schema query (`07_star_schema_query.ipynb`) |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |
