@@ -1,4 +1,4 @@
-"""Small-file fragmentation and OPTIMIZE (Task 8.1)."""
+"""Small-file fragmentation and OPTIMIZE."""
 
 from __future__ import annotations
 

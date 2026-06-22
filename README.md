@@ -2,167 +2,151 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Dimensional model + Delta ops complete · **dbt scaffold ready** (M9 — run on Databricks)  
+**Pipeline status:** Phases `01`–`09` largely complete · `06_gold_observability` ready to run · orchestration next  
 **Run results:** [`Result.md`](Result.md)
 
 ---
 
 ## Repository structure
 
+Notebook folders **`01_*` … `09_*`** — run in numeric order:
+
 ```
 ecommerce-analytics/
 ├── README.md
 ├── Result.md
-├── config/
-│   └── catalog_setup.sql
+├── config/catalog_setup.sql
 ├── notebooks/
-│   ├── m01_bronze/              # Raw ingestion
-│   ├── m03_silver_quality/      # Quality gates & silver entities
-│   ├── m02_spark_performance/   # Query plan & skew analysis
-│   ├── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
-│   ├── m05_gold_analytics/      # Gold aggregations and analytics
-│   ├── m06_dimensional/         # Star schema dimensions and fact table
-│   ├── m07_delta_ops/           # Delta OPTIMIZE, partition, VACUUM, time travel
-│   └── m09_dbt/                 # dbt debug, run, test, snapshot
-├── dbt/                         # dbt project (staging, marts, incremental fact)
-├── src/
-│   ├── ingestion/
-│   ├── quality/
-│   ├── transformations/
-│   ├── spark_performance/
-│   ├── joins/
-│   ├── gold/
-│   ├── dimensional/
-│   └── delta_ops/
-└── data/
-    ├── raw/
-    └── extracted/
+│   ├── 01_bronze/
+│   ├── 02_spark_performance/
+│   ├── 03_silver_quality/
+│   ├── 04_joins_cdc/
+│   ├── 05_gold_analytics/        # window functions & gold metrics
+│   ├── 06_gold_observability/    # materialized views, extended gold, streaming, secure views
+│   ├── 07_dimensional/           # star schema
+│   ├── 08_delta_ops/             # Delta Lake optimization
+│   └── 09_dbt/
+├── dbt/
+└── src/
+    ├── ingestion/, quality/, transformations/
+    ├── spark_performance/, joins/, gold/
+    ├── gold_observability/, dimensional/, delta_ops/
 ```
 
 ---
 
 ## Dataset
 
-Upload the 8 Olist CSVs to Databricks after catalog setup:
-
-```text
-/Volumes/globalmart/bronze/raw_landing/
-```
-
-Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `olist_order_payments_dataset.csv`, `olist_order_reviews_dataset.csv`, `olist_products_dataset.csv`, `olist_sellers_dataset.csv`, `olist_customers_dataset.csv`, `product_category_name_translation.csv`
+Upload the 8 Olist CSVs to `/Volumes/globalmart/bronze/raw_landing/` after running `config/catalog_setup.sql`.
 
 ---
 
-## Databricks setup
+## Databricks workflow
 
-1. Create a [Databricks Free Edition](https://www.databricks.com/learn/free-edition) workspace.
-2. Clone this repo into **Databricks Repos**.
-3. Run `config/catalog_setup.sql` — creates `globalmart` catalog, `bronze` / `silver` / `gold` / `metadata` schemas, and volumes.
-4. Upload CSVs to `globalmart.bronze.raw_landing`.
-5. Run notebooks in order through `m05_gold_analytics`, then `m06_dimensional` for the star schema.
-
-### Workflow
-
-- Edit locally → `git push` → Databricks **Pull**
-- Run on Databricks only — do not Commit & Push notebooks from the Databricks UI
-- After Pull: close notebook tab, re-open from Repos; restart Python to reload `src/`
+1. Clone repo into **Databricks Repos**.
+2. Run `config/catalog_setup.sql`.
+3. Upload CSVs.
+4. Run notebooks **`01_bronze` → `09_dbt`** in order (see sections below).
+5. Edit on PC → `git push` → Databricks **Pull** (never Commit & Push from Databricks UI).
 
 ---
 
-## Notebooks
+## Notebooks by folder
 
-### Bronze — `notebooks/m01_bronze/`
+### `01_bronze/` — ingestion
 
 | Notebook | Purpose |
 |----------|---------|
 | `01_idempotent_ingestion.ipynb` | Batch load 8 CSVs with fingerprint idempotency |
-| `02_auto_loader_orders.ipynb` | Auto Loader for orders with checkpoint idempotency |
-| `03_nested_payments.ipynb` | Nested + flattened payment representations |
-| `04_schema_evolution.ipynb` | Orders schema evolution + validation log |
+| `02_auto_loader_orders.ipynb` | Auto Loader for orders |
+| `03_nested_payments.ipynb` | Nested + flattened payments |
+| `04_schema_evolution.ipynb` | Schema evolution + violation log |
 
-### Silver — `notebooks/m03_silver_quality/`
+### `02_spark_performance/` — plans & optimization
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_data_quality_dlq.ipynb` | Config-driven DQ engine + dead letter queue |
-| `02_silver_orders.ipynb` | Silver orders, late arrivals, reconciliation |
-| `03_silver_order_items.ipynb` | Order items enrichment + invalid price DLQ |
+| `01_execution_plan_diagnostics.ipynb` | Predicate, join, shuffle anti-patterns |
+| `02_skew_detection.ipynb` | Skew analysis and remediation |
+| `03_higher_order_functions.ipynb` | Higher-order functions vs explode |
+
+### `03_silver_quality/` — cleaned entities
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_data_quality_dlq.ipynb` | DQ engine + dead letter queue |
+| `02_silver_orders.ipynb` | Silver orders + late arrivals + reconciliation |
+| `03_silver_order_items.ipynb` | Order items enrichment |
 | `04_silver_customers_sellers.ipynb` | Customers & sellers deduplication |
 
-### Spark performance — `notebooks/m02_spark_performance/`
+### `04_joins_cdc/` — joins & change data capture
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_execution_plan_diagnostics.ipynb` | Anti-patterns: predicate, join strategy, shuffle |
-| `02_skew_detection.ipynb` | Skew analysis, salting, adaptive optimizer |
-| `03_higher_order_functions.ipynb` | Higher-order functions vs explode on nested payments |
+| `01_business_join_questions.ipynb` | Four analytics queries + join justification |
+| `02_broadcast_join_control.ipynb` | Join strategy comparison |
+| `03_skew_distribution_report.ipynb` | Top skewed keys report |
+| `04_cdc_customers_merge.ipynb` | CDC + Delta MERGE on customers |
 
-### Joins & CDC — `notebooks/m04_joins_cdc/`
-
-| Notebook | Purpose |
-|----------|---------|
-| `01_business_join_questions.ipynb` | Four analytics queries with join-type justification |
-| `02_broadcast_join_control.ipynb` | Default vs sort-merge vs broadcast join comparison |
-| `03_skew_distribution_report.ipynb` | Top-10 skewed keys on `seller_id` and `product_id` |
-| `04_cdc_customers_merge.ipynb` | CDC batch + Delta MERGE on `silver.customers` |
-
-### Gold analytics — `notebooks/m05_gold_analytics/`
+### `05_gold_analytics/` — window functions & gold metrics
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_daily_sales_metrics.ipynb` | Daily revenue, cumulative totals, MAs, DoD change, monthly rank |
-| `02_customer_rfm.ipynb` | RFM quintile scores and named customer segments |
-| `03_category_growth_streaks.ipynb` | Categories with 3+ months consecutive revenue growth |
-| `04_customer_summary_merge.ipynb` | Customer lifetime metrics via Delta MERGE + soft delete |
-| `05_incremental_loader.ipynb` | Watermark-based incremental `bronze.orders` → `silver.orders_incremental` |
+| `01_daily_sales_metrics.ipynb` | Daily revenue, cumulative totals, MAs, DoD, rank |
+| `02_customer_rfm.ipynb` | RFM quintiles and segments |
+| `03_category_growth_streaks.ipynb` | Consecutive month growth streaks |
+| `04_customer_summary_merge.ipynb` | Customer lifetime MERGE + soft delete |
+| `05_incremental_loader.ipynb` | Watermark incremental bronze → silver |
 
-### Dimensional model — `notebooks/m06_dimensional/`
+### `06_gold_observability/` — extended gold & security *(run on Databricks)*
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_date_dimension.ipynb` | Calendar + fiscal date dimension (2016–2020) |
-| `02_surrogate_key_strategy.ipynb` | Monotonic vs hash SK stability on sellers |
-| `03_product_dimension.ipynb` | Product SCD Type 1 + category conformance |
-| `04_seller_dimension.ipynb` | Seller SCD Type 1 with hash surrogate keys |
-| `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 with version history (serverless-safe) |
-| `06_fact_sales.ipynb` | Fact table for delivered order items + dimension prep + validations |
-| `07_star_schema_query.ipynb` | Multi-dim join — top 20 revenue groups by month, state, category |
+| `01_materialized_views.ipynb` | Regular vs materialized view timing |
+| `02_gold_aggregations.ipynb` | Daily summary (new/returning) + monthly seller performance |
+| `03_streaming_orders.ipynb` | Streaming-style orders table vs bronze count |
+| `04_dynamic_views.ipynb` | Column masking + row-level secure views |
 
-### Delta operations — `notebooks/m07_delta_ops/`
+**Code:** `src/gold_observability/`
 
-| Notebook | Purpose | Status |
-|----------|---------|--------|
-| `01_small_files_optimize.ipynb` | Fragment fact into 100 partitions → OPTIMIZE | verified |
-| `02_partition_zorder.ipynb` | Partition by `order_year_month` + Z-ORDER | verified |
-| `03_vacuum.ipynb` | VACUUM dry run + execute, history | verified |
-| `04_time_travel.ipynb` | VERSION AS OF query + RESTORE | verified |
-| `05_liquid_clustering.ipynb` | Liquid CLUSTER BY vs partitioned table | verified |
+### `07_dimensional/` — star schema
 
-### dbt — `notebooks/m09_dbt/` + `dbt/`
+| Notebook | Purpose |
+|----------|---------|
+| `01_date_dimension.ipynb` | Date dimension 2016–2020 |
+| `02_surrogate_key_strategy.ipynb` | SK strategy comparison |
+| `03_product_dimension.ipynb` | Product SCD Type 1 |
+| `04_seller_dimension.ipynb` | Seller SCD Type 1 |
+| `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 |
+| `06_fact_sales.ipynb` | Fact table + validations |
+| `07_star_schema_query.ipynb` | Multi-dimension analytics query |
+
+### `08_delta_ops/` — Delta Lake
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_small_files_optimize.ipynb` | Small files + OPTIMIZE |
+| `02_partition_zorder.ipynb` | Partition + Z-ORDER |
+| `03_vacuum.ipynb` | VACUUM dry run + execute |
+| `04_time_travel.ipynb` | Time travel + RESTORE |
+| `05_liquid_clustering.ipynb` | Liquid clustering comparison |
+
+### `09_dbt/` + `dbt/` — dbt on Databricks
 
 | Item | Purpose |
 |------|---------|
-| `dbt/` | Sources, staging, marts, incremental fact, snapshot, tests, macros |
-| `dbt/README.md` | Setup, env vars, task-by-task CLI commands |
-| `01_dbt_setup_and_run.ipynb` | Install dbt-databricks, debug dev/prod, run, test, snapshot |
+| `dbt/` | Staging, marts, incremental fact, snapshot, tests |
+| `01_dbt_setup_and_run.ipynb` | Install, debug, run, test, snapshot |
 
-**Requires:** bronze tables + M6 `gold.dim_*` before running `fact_sales_incremental`.
+Requires `gold.dim_*` tables from `07_dimensional/` for the incremental fact model.
 
 ---
 
 ## Architecture
 
 ```text
-Bronze (raw) → Silver (quality & entities) → Gold (analytics) → Dimensional (star schema) → Orchestration
+Bronze → Silver → Gold → Observability → Dimensional → Delta ops → dbt → Orchestration (planned)
 ```
-
-| Layer | What's built |
-|-------|----------------|
-| **Bronze** | 8 source tables, Auto Loader orders, nested/flat payments, evolved orders |
-| **Silver** | Orders, late arrivals, order items, customers, sellers, incremental orders |
-| **Gold** | Daily sales, customer RFM, category growth streaks, customer summary |
-| **Dimensional** | Full star schema — 5 dims + `fact_sales` (110,197 rows) + analytics query (1,298 groups) |
-| **Metadata** | Ingestion log, DQ results, DLQ, reconciliation log, schema violations, pipeline watermarks, category conformance |
 
 JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
@@ -170,7 +154,8 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 ## What's next
 
-| Area | Planned work |
-|------|----------------|
-| **dbt** | Run `01_dbt_setup_and_run.ipynb` on Databricks; paste JSON for `Result.md` |
-| **Orchestration** | Databricks Workflows, Airflow, unit tests, dashboard |
+| Area | Work |
+|------|------|
+| Gold observability | Run `06_gold_observability/` notebooks on Databricks |
+| dbt | Confirm `dbt test` passes; document in `Result.md` |
+| Orchestration | Databricks Workflow, Airflow, tests, dashboard |

@@ -28,7 +28,7 @@ def analyze_key_skew(
     key_column: str,
     skew_threshold: float = DEFAULT_SKEW_THRESHOLD,
 ) -> DataFrame:
-    """Per-key counts with skew factor (count / average). Reused in M4 Task 4.3."""
+    """Per-key counts with skew factor (count / average)."""
     total = df.count()
     distinct_keys = df.select(key_column).distinct().count()
     avg_count = total / distinct_keys if distinct_keys else 0.0

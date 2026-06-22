@@ -1,81 +1,44 @@
-# GlobalMart dbt project (Milestone 9)
+# GlobalMart dbt project
 
-Rebuilds silver-style staging, gold marts, an incremental fact, and a customer snapshot on Databricks Unity Catalog.
+Rebuilds staging, gold marts, an incremental fact, and a customer snapshot on Databricks Unity Catalog.
 
 ## Prerequisites
 
 - Bronze tables loaded (`globalmart.bronze.*`)
-- Gold dimensions from M6 (`globalmart.gold.dim_*`) — required for `fact_sales_incremental`
-- SQL warehouse or serverless endpoint HTTP path
+- Gold dimensions from `07_dimensional/` (`globalmart.gold.dim_*`)
+- SQL warehouse HTTP path + token in `dbt/profiles.yml`
 
-## Setup (local or Databricks notebook)
+## Setup
 
 ```bash
 pip install -r dbt/requirements.txt
-cp dbt/profiles.yml.example dbt/profiles.yml
+cp dbt/profiles.yml.example dbt/profiles.yml   # then add token
 ```
 
-Set environment variables:
+Host must be **without** `https://` prefix, e.g. `dbc-xxxxx.cloud.databricks.com`.
 
-```bash
-export DATABRICKS_HOST="https://<workspace>.cloud.databricks.com"
-export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/<warehouse-id>"
-export DATABRICKS_TOKEN="<personal-access-token>"
-```
-
-## Task 9.1 — debug both targets
+## Commands
 
 ```bash
 cd dbt
 dbt debug --target dev
 dbt debug --target prod
 dbt source freshness --target dev
-```
-
-## Task 9.2 — staging + marts
-
-```bash
 dbt run --target dev
-dbt docs generate --target dev
-```
-
-Models land in:
-
-| Layer | Schema (dev target) |
-|-------|---------------------|
-| Staging views | `globalmart.dbt_dev_staging` |
-| Marts / fact | `globalmart.dbt_dev_marts` |
-| Snapshots | `globalmart.dbt_dev.snap_customers` (dev target schema) |
-
-Older runs may have created `globalmart.snapshots.snap_customers` before the schema fix.
-
-Prod uses `dbt_prod_*` schemas when `--target prod`.
-
-## Task 9.3 — incremental fact
-
-```bash
+dbt test --target dev
 dbt run --select fact_sales_incremental --target dev
-# Re-run with no new bronze data — row count unchanged (idempotent merge)
-dbt run --select fact_sales_incremental --target dev
-```
-
-## Task 9.4 — snapshot
-
-Simulate a customer attribute change in bronze, refresh staging, then:
-
-```bash
 dbt snapshot --target dev
 ```
 
-Compare `dbt_dev_snapshots.snap_customers` to manual SCD2 in `gold.dim_customer`.
+Or run `notebooks/09_dbt/01_dbt_setup_and_run.ipynb` on Databricks.
 
-## Task 9.5 — tests
+## Output schemas (dev target)
 
-```bash
-dbt test --target dev
-```
-
-Includes built-in schema tests, referential integrity to gold dims, and singular test `assert_delivered_orders_positive_revenue`.
+| Layer | Schema |
+|-------|--------|
+| Staging | `globalmart.dbt_dev_staging` |
+| Marts / fact | `globalmart.dbt_dev_marts` |
+| Snapshots | `globalmart.dbt_dev` |
 
 ## Macros
 

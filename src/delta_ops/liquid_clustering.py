@@ -1,4 +1,4 @@
-"""Liquid auto clustering comparison (Task 8.5)."""
+"""Liquid auto clustering comparison."""
 
 from __future__ import annotations
 

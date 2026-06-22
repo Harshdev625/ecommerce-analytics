@@ -33,7 +33,7 @@ models:
         description: Monetary quintile (5 = highest spend).
 
   - name: fact_sales_incremental
-    description: Incremental fact table keyed to existing gold dimensions (Task 9.3).
+    description: Incremental fact table keyed to existing gold dimensions.
     columns:
       - name: order_id
         tests:

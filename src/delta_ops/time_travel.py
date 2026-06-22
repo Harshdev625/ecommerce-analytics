@@ -1,4 +1,4 @@
-"""Delta time travel: modify, query old version, restore (Task 8.4)."""
+"""Delta time travel: modify, query old version, restore."""
 
 from __future__ import annotations
 

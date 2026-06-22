@@ -1,4 +1,4 @@
-"""VACUUM dry-run and execution (Task 8.3)."""
+"""VACUUM dry-run and execution."""
 
 from __future__ import annotations
 

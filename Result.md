@@ -471,7 +471,7 @@ All **top 20** rows are **São Paulo (SP)**; leading categories include **health
 | Avg file size | **~46 KB** (small-file problem) | **~3.28 MB** |
 | Files reduced | — | **99** |
 
-OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (deleted-row overhead removed). **Passed** — demonstrates Task 8.1 before/after DESCRIBE DETAIL.
+OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (deleted-row overhead removed). **Verified** on Databricks.
 
 ### Partitioning & Z-ORDER
 
@@ -494,7 +494,7 @@ OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (d
 
 **DESCRIBE DETAIL (before / after Z-ORDER):** 23 files, ~173 KB avg each, ~3.99 MB total — file count unchanged because each month-partition already had one file; Z-ORDER still colocates high-cardinality filter columns within files.
 
-**Partition pruning:** filter `order_year_month = 201803` appears in logical plan (`Filter (order_year_month = 201803)`). **Passed** Task 8.2.
+**Partition pruning:** filter `order_year_month = 201803` appears in logical plan (`Filter (order_year_month = 201803)`). **Verified.**
 
 ### VACUUM
 
@@ -509,7 +509,7 @@ OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (d
 
 **Dry run:** **0** files eligible for deletion — all versions are within the 168 h retention window (table created and optimized ~30 min before VACUUM). OPTIMIZE already compacted the 100 fragment files at v1; nothing outside retention to purge yet.
 
-**Execute VACUUM:** history shows **VACUUM START** (v2, `numFilesToDelete: 0`) and **VACUUM END** (v3, `status: COMPLETED`, `numDeletedFiles: 0`). **Passed** Task 8.3 — multiple versions confirmed, dry-run then execute, VACUUM entries in history.
+**Execute VACUUM:** history shows **VACUUM START** (v2, `numFilesToDelete: 0`) and **VACUUM END** (v3, `status: COMPLETED`, `numDeletedFiles: 0`). **Verified** — multiple versions, dry-run, execute, history entries.
 
 ### Time travel
 
@@ -522,12 +522,12 @@ OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (d
 | Query **VERSION AS OF 0** | **15,419,773.75** |
 | After **RESTORE** to v0 | **15,419,773.75** |
 
-`restore_matches_baseline`: **true** — time travel read and restore both recover the original aggregate. **Passed** Task 8.4.
+`restore_matches_baseline`: **true** — time travel read and restore both recover the original aggregate. **Verified.**
 
 ### Liquid clustering
 
 **Report:** `delta_liquid_cluster.json` · **Table:** `globalmart.gold.fact_sales_liquid_cluster`  
-**Compared to:** `globalmart.gold.fact_sales_partitioned` (notebook 02)
+**Compared to:** `globalmart.gold.fact_sales_partitioned` (`08_delta_ops/02`)
 
 | Setting | Value |
 |---------|-------|
@@ -544,9 +544,69 @@ OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (d
 
 Revenue matches on both layouts; liquid clustering ~**2.4×** faster on this run (timing varies by cluster load).
 
-**DESCRIBE DETAIL:** `clustering_columns` = `[date_key, product_sk]`; **1** file before append (~3.34 MB) and after append + OPTIMIZE (~3.45 MB). **Passed** Task 8.5.
+**DESCRIBE DETAIL:** `clustering_columns` = `[date_key, product_sk]`; **1** file before append (~3.34 MB) and after append + OPTIMIZE (~3.45 MB). **Verified.**
 
-**Milestone 8 (Delta operations): complete** — notebooks 01–05 verified on Databricks.
+**Delta operations complete** — notebooks `08_delta_ops/` 01–05 verified on Databricks.
+
+---
+
+## dbt
+
+**Notebook:** `09_dbt/01_dbt_setup_and_run.ipynb` · **Project:** `dbt/`
+
+### Setup & sources
+
+| Check | Result |
+|-------|--------|
+| `dbt debug` (dev) | **All checks passed** |
+| `dbt debug` (prod) | **All checks passed** |
+| `dbt source freshness` | **8/8 PASS** (bronze sources, `_ingested_at`) |
+| Dev schema | `globalmart.dbt_dev` |
+| Prod schema | `globalmart.dbt_prod` |
+
+### Incremental fact
+
+**Table:** `globalmart.dbt_dev_marts.fact_sales_incremental`
+
+| Run | Row count |
+|-----|-----------|
+| After initial `dbt run --select fact_sales_incremental` | **110,197** |
+| After second run (same data) | **110,197** |
+
+`idempotent_rerun`: **true** — matches `gold.fact_sales` row count; merge incremental is idempotent. **Verified.**
+
+### Customer snapshot
+
+**Table:** `globalmart.dbt_dev.snap_customers` · **Rows:** **99,441**
+
+dbt snapshot strategy: `timestamp` on `processed_at`, `unique_key = customer_id`. Compare to SCD2 in `gold.dim_customer`. **Verified.**
+
+### Staging, marts, tests
+
+Built by `dbt run` / `dbt test` in notebook:
+
+| Layer | Objects |
+|-------|---------|
+| Staging | `stg_orders`, `stg_order_items`, `stg_customers`, `stg_sellers`, `stg_products` |
+| Intermediate | `int_delivered_order_items` |
+| Marts | `mart_daily_sales`, `mart_customer_rfm` |
+| Macro | `normalize_city` / `normalize_state` (customers + sellers) |
+| Tests | Schema tests + `assert_delivered_orders_positive_revenue` |
+
+Incremental fact + snapshot verified on Databricks; confirm `dbt test` output for full test suite sign-off.
+
+---
+
+## Gold observability
+
+**Folder:** `06_gold_observability/` · **Code:** `src/gold_observability/`
+
+| Notebook | Target / output | Status |
+|----------|-----------------|--------|
+| `01_materialized_views.ipynb` | `gold.v_seller_daily_revenue`, `gold.mv_seller_daily_revenue` | pending Databricks run |
+| `02_gold_aggregations.ipynb` | `gold.daily_sales_summary`, `gold.seller_performance_monthly` | pending |
+| `03_streaming_orders.ipynb` | `gold.orders_stream` vs `bronze.orders` | pending |
+| `04_dynamic_views.ipynb` | `gold.v_customers_masked`, `gold.v_fact_sales_by_state` | pending |
 
 ---
 
@@ -554,5 +614,4 @@ Revenue matches on both layouts; liquid clustering ~**2.4×** faster on this run
 
 | Area | Planned work |
 |------|----------------|
-| **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |

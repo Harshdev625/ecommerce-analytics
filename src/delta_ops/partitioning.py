@@ -1,4 +1,4 @@
-"""Partitioning, Z-ORDER, and partition-pruning checks (Task 8.2)."""
+"""Partitioning, Z-ORDER, and partition-pruning checks."""
 
 from __future__ import annotations
 
