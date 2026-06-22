@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze, Silver, and Spark performance layers built · Gold and orchestration not started yet  
+**Pipeline status:** Bronze, Silver, Spark performance, and Joins & CDC built · Gold and orchestration not started yet  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -18,12 +18,14 @@ ecommerce-analytics/
 ├── notebooks/
 │   ├── m01_bronze/              # Raw ingestion
 │   ├── m03_silver_quality/      # Quality gates & silver entities
-│   └── m02_spark_performance/   # Query plan & skew analysis
+│   ├── m02_spark_performance/   # Query plan & skew analysis
+│   └── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
 ├── src/
 │   ├── ingestion/
 │   ├── quality/
 │   ├── transformations/
-│   └── spark_performance/
+│   ├── spark_performance/
+│   └── joins/
 └── data/
     ├── raw/
     └── extracted/
@@ -87,6 +89,15 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `02_skew_detection.ipynb` | Skew analysis, salting, adaptive optimizer |
 | `03_higher_order_functions.ipynb` | Higher-order functions vs explode on nested payments |
 
+### Joins & CDC — `notebooks/m04_joins_cdc/`
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_business_join_questions.ipynb` | Four analytics queries with join-type justification |
+| `02_broadcast_join_control.ipynb` | Default vs sort-merge vs broadcast join comparison |
+| `03_skew_distribution_report.ipynb` | Top-10 skewed keys on `seller_id` and `product_id` |
+| `04_cdc_customers_merge.ipynb` | CDC batch + Delta MERGE on `silver.customers` |
+
 ---
 
 ## Architecture
@@ -110,7 +121,6 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **Joins & CDC** | Business join queries, broadcast control, customer MERGE |
 | **Gold analytics** | Daily sales, RFM, seller performance, aggregations |
 | **Dimensional model** | Star schema — date/product/seller/customer dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |

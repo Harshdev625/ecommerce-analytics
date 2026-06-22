@@ -202,6 +202,7 @@ Not built yet.
 | `joins_business_questions.json` | Business join questions |
 | `joins_broadcast_control.json` | Broadcast join control |
 | `joins_skew_distribution.json` | Skew distribution report |
+| `joins_cdc_customers.json` | CDC customer MERGE simulation |
 
 ---
 
@@ -252,13 +253,28 @@ All plans include a shuffle on the sellers scan before broadcast — typical on 
 
 All top-10 keys flagged `is_skewed: true` for both columns.
 
+### CDC customer MERGE
+
+**Report:** `joins_cdc_customers.json` · **Target:** `globalmart.silver.customers`
+
+| Metric | Value |
+|--------|-------|
+| Batch size | **18** (6 insert + 6 update + 6 delete) |
+| Row count before | 99,441 |
+| Row count after | 99,441 |
+| Inserts applied | **6 / 6** |
+| Updates applied | **6 / 6** (city suffixed ` (CDC Updated)`) |
+| Deletes removed | **6 / 6** (0 remaining) |
+| **all_verified** | **true** |
+
+MERGE handles delete, update (city/state/zip + `processed_at`), and insert on `customer_id`. Re-run `04_silver_customers_sellers.ipynb` to restore the table after testing.
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Joins & CDC** | Customer MERGE (CDC simulation) |
 | **Gold analytics** | Daily sales, RFM, seller performance, aggregations |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
