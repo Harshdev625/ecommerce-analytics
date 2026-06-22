@@ -7,12 +7,30 @@ from dataclasses import dataclass
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    BooleanType,
+    DataType,
+    DateType,
+    DecimalType,
+    DoubleType,
+    FloatType,
+    IntegerType,
+    LongType,
+    ShortType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 from pyspark.sql.window import Window
 
 from src.joins.business_questions import SilverJoinTables
 
 CDC_OPERATION_COL = "cdc_operation"
 MUTABLE_COLS = ("customer_city", "customer_state", "customer_zip_code_prefix")
+METADATA_COLS = frozenset(
+    {CDC_OPERATION_COL, "processed_at", "_ingested_at", "ingested_at"}
+)
 
 
 @dataclass
@@ -27,16 +45,49 @@ class CdcBatchCounts:
 
 
 def _data_columns(table_columns: list[str]) -> list[str]:
-    """Target data columns (exclude metadata and CDC flag)."""
-    return [c for c in table_columns if c not in ("processed_at", CDC_OPERATION_COL)]
+    """Target data columns (exclude lineage metadata and CDC flag)."""
+    return [c for c in table_columns if c not in METADATA_COLS]
 
 
-def _with_null_columns(df: DataFrame, columns: list[str]) -> DataFrame:
+def _schema_map(df: DataFrame) -> dict[str, DataType]:
+    return {field.name: field.dataType for field in df.schema.fields}
+
+
+def _with_null_columns(
+    df: DataFrame, columns: list[str], schema_map: dict[str, DataType]
+) -> DataFrame:
     out = df
     for col in columns:
         if col not in out.columns:
-            out = out.withColumn(col, F.lit(None).cast("string"))
+            out = out.withColumn(col, F.lit(None).cast(schema_map[col]))
     return out
+
+
+def _insert_cell_value(name: str, dtype: DataType, index: int):
+    if name == "customer_id":
+        return f"cdc-insert-{uuid.uuid4().hex[:12]}"
+    if name == "customer_zip_code_prefix":
+        return str(10000 + index)
+    if name == "customer_city":
+        return f"Cdc City {index}"
+    if name == "customer_state":
+        return "SP"
+    if isinstance(dtype, (TimestampType, DateType)):
+        return None
+    if isinstance(dtype, BooleanType):
+        return None
+    if isinstance(dtype, (IntegerType, LongType, ShortType)):
+        return None
+    if isinstance(dtype, (DoubleType, FloatType, DecimalType)):
+        return None
+    return None
+
+
+def _cdc_batch_schema(customers: DataFrame, data_cols: list[str]) -> StructType:
+    return StructType(
+        [customers.schema[c] for c in data_cols]
+        + [StructField(CDC_OPERATION_COL, StringType(), False)]
+    )
 
 
 def generate_cdc_batch(
@@ -48,6 +99,7 @@ def generate_cdc_batch(
     counts = counts or CdcBatchCounts()
     customers = spark.table(customers_table)
     data_cols = _data_columns(customers.columns)
+    col_types = _schema_map(customers)
 
     ranked = customers.withColumn(
         "_rn",
@@ -64,7 +116,11 @@ def generate_cdc_batch(
     delete_src = (
         ranked.filter(F.col("_rn") <= counts.deletes)
         .select("customer_id")
-        .transform(lambda df: _with_null_columns(df, [c for c in data_cols if c != "customer_id"]))
+        .transform(
+            lambda df: _with_null_columns(
+                df, [c for c in data_cols if c != "customer_id"], col_types
+            )
+        )
         .withColumn(CDC_OPERATION_COL, F.lit("delete"))
     )
 
@@ -72,19 +128,10 @@ def generate_cdc_batch(
     for i in range(counts.inserts):
         row = {CDC_OPERATION_COL: "insert"}
         for col in data_cols:
-            if col == "customer_id":
-                row[col] = f"cdc-insert-{uuid.uuid4().hex[:12]}"
-            elif col == "customer_zip_code_prefix":
-                row[col] = f"{10000 + i}"
-            elif col == "customer_city":
-                row[col] = f"Cdc City {i}"
-            elif col == "customer_state":
-                row[col] = "SP"
-            else:
-                row[col] = f"cdc-{col}-{i}"
+            row[col] = _insert_cell_value(col, col_types[col], i)
         insert_rows.append(row)
 
-    insert_src = spark.createDataFrame(insert_rows)
+    insert_src = spark.createDataFrame(insert_rows, schema=_cdc_batch_schema(customers, data_cols))
 
     batch = (
         update_src.select(*data_cols, CDC_OPERATION_COL)
