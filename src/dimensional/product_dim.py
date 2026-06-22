@@ -27,6 +27,22 @@ PRODUCT_DIM_COLUMNS = (
     "product_width_cm",
 )
 
+# Olist CSV typos: *lenght instead of *length
+_OLIST_TYPO_ALIASES: dict[str, str] = {
+    "product_name_length": "product_name_lenght",
+    "product_description_length": "product_description_lenght",
+}
+
+
+def _bronze_col(df: DataFrame, canonical: str) -> F.Column:
+    """Resolve a bronze column, falling back to known Olist typo spellings."""
+    if canonical in df.columns:
+        return F.col(canonical)
+    typo = _OLIST_TYPO_ALIASES.get(canonical)
+    if typo and typo in df.columns:
+        return F.col(typo)
+    raise ValueError(f"Column {canonical!r} not found in bronze products (also tried {typo!r})")
+
 
 @dataclass
 class ProductDimConfig:
@@ -60,15 +76,22 @@ def build_product_dimension_source(
     products = spark.table(config.bronze_products)
     translation = spark.table(config.bronze_translation)
 
-    # Olist source CSV misspells product_name_length as product_name_lenght.
-    name_length = (
-        F.col("product_name_length")
-        if "product_name_length" in products.columns
-        else F.col("product_name_lenght")
-    )
+    attribute_cols = [
+        "product_name_length",
+        "product_description_length",
+        "product_photos_qty",
+        "product_weight_g",
+        "product_length_cm",
+        "product_height_cm",
+        "product_width_cm",
+    ]
+
+    normalized = products
+    for col in attribute_cols:
+        normalized = normalized.withColumn(col, _bronze_col(products, col))
 
     return (
-        products.join(
+        normalized.join(
             translation.select("product_category_name", "product_category_name_english"),
             on="product_category_name",
             how="left",
@@ -78,7 +101,6 @@ def build_product_dimension_source(
             F.coalesce(F.col("product_category_name_english"), F.lit("unknown")),
         )
         .withColumn("product_sk", hash_surrogate_key(F.col("product_id")))
-        .withColumn("product_name_length", name_length)
         .select(*PRODUCT_DIM_COLUMNS)
         .withColumn("processed_at", F.current_timestamp())
     )
