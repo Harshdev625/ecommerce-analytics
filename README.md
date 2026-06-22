@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Dimensional model done · Delta ops notebooks ready (run on Databricks)  
+**Pipeline status:** Dimensional model + Delta ops complete (M7 verified on Databricks)  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -128,13 +128,13 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 
 ### Delta operations — `notebooks/m07_delta_ops/`
 
-| Notebook | Purpose |
-|----------|---------|
-| `01_small_files_optimize.ipynb` | Fragment fact into 100 partitions → OPTIMIZE |
-| `02_partition_zorder.ipynb` | Partition by `order_year_month` + Z-ORDER |
-| `03_vacuum.ipynb` | VACUUM dry run + execute, history |
-| `04_time_travel.ipynb` | VERSION AS OF query + RESTORE |
-| `05_liquid_clustering.ipynb` | Liquid CLUSTER BY vs partitioned table |
+| Notebook | Purpose | Status |
+|----------|---------|--------|
+| `01_small_files_optimize.ipynb` | Fragment fact into 100 partitions → OPTIMIZE | verified |
+| `02_partition_zorder.ipynb` | Partition by `order_year_month` + Z-ORDER | verified |
+| `03_vacuum.ipynb` | VACUUM dry run + execute, history | verified |
+| `04_time_travel.ipynb` | VERSION AS OF query + RESTORE | verified |
+| `05_liquid_clustering.ipynb` | Liquid CLUSTER BY vs partitioned table | verified |
 
 ---
 
@@ -160,6 +160,5 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **Delta ops** | Run `m07_delta_ops/` notebooks 01–05 on Databricks |
 | **dbt** | Staging and mart models on Databricks |
 | **Orchestration** | Databricks Workflows, Airflow, unit tests, dashboard |

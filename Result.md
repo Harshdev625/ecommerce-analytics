@@ -457,10 +457,102 @@ All **top 20** rows are **São Paulo (SP)**; leading categories include **health
 
 ---
 
+## Delta operations
+
+### Small files & OPTIMIZE
+
+**Report:** `delta_small_files.json` · **Table:** `globalmart.gold.fact_sales_fragmented`
+
+| Metric | Before OPTIMIZE | After OPTIMIZE |
+|--------|-----------------|----------------|
+| Row count | **110,197** (matches `fact_sales`) | same |
+| `num_files` | **100** (100 Spark partitions) | **1** |
+| Total size | 4.65 MB | 3.28 MB |
+| Avg file size | **~46 KB** (small-file problem) | **~3.28 MB** |
+| Files reduced | — | **99** |
+
+OPTIMIZE compacted 100 tiny files into a single file and reduced on-disk size (deleted-row overhead removed). **Passed** — demonstrates Task 8.1 before/after DESCRIBE DETAIL.
+
+### Partitioning & Z-ORDER
+
+**Report:** `delta_partition_zorder.json` · **Table:** `globalmart.gold.fact_sales_partitioned`
+
+| Metric | Value |
+|--------|-------|
+| Rows | **110,197** |
+| Partition column | **`order_year_month`** |
+| Z-ORDER columns | `date_key`, `product_sk`, `seller_sk` |
+| Partition buckets | **23** month directories (= **23** data files) |
+
+**Cardinality analysis (delivered orders only):**
+
+| Candidate | Distinct values | Verdict |
+|-----------|-----------------|---------|
+| `year` | 3 | Too coarse for pruning |
+| `order_year_month` | **23** | **Chosen** — moderate cardinality |
+| `date_key` | 612 | Too granular for hive-style partitions |
+
+**DESCRIBE DETAIL (before / after Z-ORDER):** 23 files, ~173 KB avg each, ~3.99 MB total — file count unchanged because each month-partition already had one file; Z-ORDER still colocates high-cardinality filter columns within files.
+
+**Partition pruning:** filter `order_year_month = 201803` appears in logical plan (`Filter (order_year_month = 201803)`). **Passed** Task 8.2.
+
+### VACUUM
+
+**Report:** `delta_vacuum.json` · **Table:** `globalmart.gold.fact_sales_fragmented` · **Retention:** **168 h** (7 days)
+
+**Versions before VACUUM:**
+
+| Version | Operation | Notes |
+|---------|-----------|-------|
+| 0 | CREATE OR REPLACE TABLE AS SELECT | 100 files, **110,197** rows |
+| 1 | OPTIMIZE | 100 files removed → **1** file |
+
+**Dry run:** **0** files eligible for deletion — all versions are within the 168 h retention window (table created and optimized ~30 min before VACUUM). OPTIMIZE already compacted the 100 fragment files at v1; nothing outside retention to purge yet.
+
+**Execute VACUUM:** history shows **VACUUM START** (v2, `numFilesToDelete: 0`) and **VACUUM END** (v3, `status: COMPLETED`, `numDeletedFiles: 0`). **Passed** Task 8.3 — multiple versions confirmed, dry-run then execute, VACUUM entries in history.
+
+### Time travel
+
+**Report:** `delta_time_travel.json` · **Table:** `globalmart.gold.fact_sales_timeline_demo`
+
+| Step | Total revenue (R$) |
+|------|-------------------|
+| Baseline (v**0**) | **15,419,773.75** (matches `fact_sales`) |
+| After modifying `order_item_id` **1** | **25,067,573.75** |
+| Query **VERSION AS OF 0** | **15,419,773.75** |
+| After **RESTORE** to v0 | **15,419,773.75** |
+
+`restore_matches_baseline`: **true** — time travel read and restore both recover the original aggregate. **Passed** Task 8.4.
+
+### Liquid clustering
+
+**Report:** `delta_liquid_cluster.json` · **Table:** `globalmart.gold.fact_sales_liquid_cluster`  
+**Compared to:** `globalmart.gold.fact_sales_partitioned` (notebook 02)
+
+| Setting | Value |
+|---------|-------|
+| `CLUSTER BY` | `date_key`, `product_sk` |
+| Filter | `date_key = 20180315` |
+| Rows appended (growth sim) | **5,509** |
+
+**Filtered revenue query (`date_key = 20180315`):**
+
+| Table | Revenue (R$) | Elapsed (ms) |
+|-------|--------------|--------------|
+| Liquid cluster | **48,505.73** | **762.5** |
+| Partitioned + Z-ORDER | **48,505.73** | **1,809.5** |
+
+Revenue matches on both layouts; liquid clustering ~**2.4×** faster on this run (timing varies by cluster load).
+
+**DESCRIBE DETAIL:** `clustering_columns` = `[date_key, product_sk]`; **1** file before append (~3.34 MB) and after append + OPTIMIZE (~3.45 MB). **Passed** Task 8.5.
+
+**Milestone 8 (Delta operations): complete** — notebooks 01–05 verified on Databricks.
+
+---
+
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |
