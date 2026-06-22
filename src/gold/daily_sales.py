@@ -140,8 +140,14 @@ def run_daily_sales_metrics(
     metrics.write.format("delta").mode("overwrite").saveAsTable(config.target_table)
 
     written = spark.table(config.target_table)
-    month_df = sample_month(written, sample_year, sample_month_num)
-    month_rows = [row.asDict() for row in month_df.collect()]
+    month_rows = [
+        row.asDict()
+        for row in sample_month(written, sample_year, sample_month_num).collect()
+    ]
+    # Normalize Spark date/timestamp values for JSON reports.
+    import json as _json
+
+    month_rows = _json.loads(_json.dumps(month_rows, default=str))
 
     delivered_count = delivered_orders_with_revenue(spark, tables).select("order_id").distinct().count()
 

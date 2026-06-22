@@ -203,6 +203,7 @@ Not built yet.
 | `joins_broadcast_control.json` | Broadcast join control |
 | `joins_skew_distribution.json` | Skew distribution report |
 | `joins_cdc_customers.json` | CDC customer MERGE simulation |
+| `gold_daily_sales.json` | Gold daily sales metrics |
 
 ---
 
@@ -271,11 +272,29 @@ MERGE handles delete, update (city/state/zip + `processed_at`), and insert on `c
 
 ---
 
+## Gold analytics
+
+### Daily sales metrics
+
+**Report:** `gold_daily_sales.json` · **Table:** `globalmart.gold.daily_sales_metrics`
+
+| Metric | Value |
+|--------|-------|
+| Daily rows | **612** |
+| Date range | 2016-09-15 → 2018-08-29 |
+| Window sizes | 7-day and 30-day moving averages |
+| Sample month | January 2018 (31 days) |
+| Top revenue day (Jan 2018) | **2018-01-16** — R$48,922.60 (296 orders, rank 1 in month) |
+
+Metrics include cumulative revenue, DoD change (abs + %), and within-month revenue rank.
+
+---
+
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Gold analytics** | Daily sales, RFM, seller performance, aggregations |
+| **Gold analytics** | RFM, category growth streaks, customer summary MERGE, incremental loader |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |

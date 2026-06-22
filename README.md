@@ -105,6 +105,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | Notebook | Purpose |
 |----------|---------|
 | `01_daily_sales_metrics.ipynb` | Daily revenue, cumulative totals, MAs, DoD change, monthly rank |
+| `02_customer_rfm.ipynb` | RFM quintile scores and named customer segments |
 
 ---
 

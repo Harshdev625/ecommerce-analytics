@@ -348,7 +348,7 @@ def save_run_report_to_volume(
     """Save JSON to a Unity Catalog volume (no personal workspace paths)."""
     import json
 
-    payload = json.dumps(report, indent=2)
+    payload = json.dumps(report, indent=2, default=str)
     parent = "/".join(output_path.split("/")[:-1])
     dbutils.fs.mkdirs(parent)
     dbutils.fs.put(output_path, payload, overwrite=True)
