@@ -114,18 +114,25 @@ def skewed_join_aggregate(
     items: DataFrame,
     partner: DataFrame,
     key_col: str = "seller_id",
+    force_sort_merge: bool = True,
 ) -> DataFrame:
-    """Group-by after join so skew shows up at the shuffle join."""
+    """Group-by after join. Default forces sort-merge to surface skew pain."""
     value_col = "line_total_value" if "line_total_value" in items.columns else None
     agg_exprs = [F.count("*").alias("line_count")]
     if value_col:
         agg_exprs.insert(0, F.sum(value_col).alias("revenue"))
 
-    return (
-        items.join(partner.hint("merge"), key_col)
-        .groupBy(key_col)
-        .agg(*agg_exprs)
-    )
+    right = partner.hint("merge") if force_sort_merge else partner
+    return items.join(right, key_col).groupBy(key_col).agg(*agg_exprs)
+
+
+def skewed_join_adaptive_default(
+    items: DataFrame,
+    partner: DataFrame,
+    key_col: str = "seller_id",
+) -> DataFrame:
+    """Let Catalyst/AQE choose the plan (broadcast small partner when beneficial)."""
+    return skewed_join_aggregate(items, partner, key_col, force_sort_merge=False)
 
 
 def salted_join_aggregate(
@@ -167,8 +174,29 @@ def salted_join_aggregate(
     return joined.groupBy(key_col).agg(*agg_exprs)
 
 
+def _short_exc(exc: Exception) -> str:
+    msg = str(exc).split("\n", 1)[0]
+    return msg[:120] + "..." if len(msg) > 120 else msg
+
+
+def read_skew_conf_snapshot(spark: SparkSession) -> dict[str, str]:
+    """Read adaptive/skew settings (Databricks Free may block writes but allow reads)."""
+    keys = (
+        "spark.sql.adaptive.enabled",
+        "spark.sql.adaptive.skewJoin.enabled",
+        "spark.sql.adaptive.skewJoin.skewedPartitionFactor",
+    )
+    snapshot: dict[str, str] = {}
+    for key in keys:
+        try:
+            snapshot[key] = spark.conf.get(key)
+        except Exception as exc:
+            snapshot[key] = f"unavailable: {_short_exc(exc)}"
+    return snapshot
+
+
 def set_skew_join_conf(spark: SparkSession, enabled: bool) -> dict[str, str]:
-    """Toggle AQE skew join. Returns settings applied (or skip reason)."""
+    """Try to toggle AQE skew join. Often blocked on Databricks Free (Spark Connect)."""
     flag = "true" if enabled else "false"
     settings = {
         "spark.sql.adaptive.enabled": "true",
@@ -182,7 +210,7 @@ def set_skew_join_conf(spark: SparkSession, enabled: bool) -> dict[str, str]:
             spark.conf.set(key, value)
             applied[key] = value
         except Exception as exc:
-            applied[key] = f"skipped: {exc}"
+            applied[key] = f"skipped: {_short_exc(exc)}"
     return applied
 
 
@@ -220,15 +248,21 @@ def run_skew_remediation_comparison(
     }
 
     aqe_conf = set_skew_join_conf(spark, enabled=True)
-    aqe_df = skewed_join_aggregate(skewed_items, partner, key_col)
-    approaches["aqe_skew_join"] = {
+    conf_readable = read_skew_conf_snapshot(spark)
+    aqe_df = skewed_join_adaptive_default(skewed_items, partner, key_col)
+    approaches["adaptive_optimizer_default"] = {
         "explain_snippet": capture_explain(aqe_df).splitlines()[:14],
         "timing": benchmark_df(aqe_df),
-        "spark_conf": aqe_conf,
+        "spark_conf_set_attempt": aqe_conf,
+        "spark_conf_snapshot": conf_readable,
+        "note": (
+            "Databricks Free blocks spark.conf skew toggles; "
+            "this approach lets AdaptiveSparkPlan + auto-broadcast choose the plan."
+        ),
     }
 
     baseline_ms = approaches["baseline"]["timing"]["elapsed_ms"]
-    for name in ("salted", "aqe_skew_join"):
+    for name in ("salted", "adaptive_optimizer_default"):
         good_ms = approaches[name]["timing"]["elapsed_ms"]
         approaches[name]["speedup_vs_baseline_x"] = (
             round(baseline_ms / good_ms, 2) if good_ms > 0 else None
