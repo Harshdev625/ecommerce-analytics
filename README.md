@@ -120,6 +120,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `02_surrogate_key_strategy.ipynb` | Monotonic vs hash SK stability on sellers |
 | `03_product_dimension.ipynb` | Product SCD Type 1 + category conformance |
 | `04_seller_dimension.ipynb` | Seller SCD Type 1 with hash surrogate keys |
+| `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 with version history |
 
 ---
 
