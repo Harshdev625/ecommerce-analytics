@@ -205,6 +205,7 @@ Not built yet.
 | `joins_cdc_customers.json` | CDC customer MERGE simulation |
 | `gold_daily_sales.json` | Gold daily sales metrics |
 | `gold_customer_rfm.json` | Customer RFM segmentation |
+| `gold_category_growth.json` | Category growth streaks |
 
 ---
 
@@ -307,13 +308,24 @@ Metrics include cumulative revenue, DoD change (abs + %), and within-month reven
 
 No **Champions** or **Lost** segments — most customers have exactly one Olist order (`frequency = 1`), so F-score quintiles collapse and high-R/high-M thresholds rarely co-occur.
 
+### Category growth streaks
+
+**Report:** `gold_category_growth.json` · **Table:** `globalmart.gold.category_growth_streaks`
+
+| Metric | Value |
+|--------|-------|
+| Min streak length | **3** consecutive months of positive MoM revenue growth |
+| Qualifying streaks | **69** |
+| Longest streak | **7 months** — `construction_tools_construction` (2017-05 → 2017-11, +5,654%) |
+| Notable 6-month streaks | `auto`, `cool_stuff`, `furniture_bedroom`, `health_beauty` |
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Gold analytics** | Category growth streaks, customer summary MERGE, incremental loader |
+| **Gold analytics** | Customer summary MERGE, incremental loader |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
