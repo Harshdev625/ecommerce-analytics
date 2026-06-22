@@ -52,10 +52,9 @@ The `data/` directory is gitignored. Upload the CSVs to Databricks after running
 2. Clone this repo into **Databricks Repos**.
 3. Run `config/catalog_setup.sql` in the SQL editor to create the `globalmart` catalog, schemas (`bronze`, `silver`, `gold`, `metadata`), and the `raw_landing` volume.
 4. Upload the 8 CSV files to `globalmart.bronze.raw_landing` via Catalog Explorer.
-5. Run `notebooks/m01_bronze/01_idempotent_ingestion.ipynb` to load bronze tables.
-6. Run `notebooks/m01_bronze/02_auto_loader_orders.ipynb` for Auto Loader ingestion.
+6. Run bronze notebooks in `notebooks/m01_bronze/` (01 → 04).
 
-## Bronze notebooks
+## Bronze notebooks (complete)
 
 | Notebook | Purpose |
 |----------|---------|
