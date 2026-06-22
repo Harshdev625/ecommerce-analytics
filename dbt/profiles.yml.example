@@ -1,0 +1,23 @@
+# Copy to profiles.yml (gitignored) or ~/.dbt/profiles.yml
+# Set env vars before running: DATABRICKS_HOST, DATABRICKS_HTTP_PATH, DATABRICKS_TOKEN
+
+globalmart:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: globalmart
+      schema: dbt_dev
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4
+
+    prod:
+      type: databricks
+      catalog: globalmart
+      schema: dbt_prod
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4

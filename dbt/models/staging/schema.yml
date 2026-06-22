@@ -1,0 +1,82 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Deduped bronze orders with parsed timestamps and delivery metrics.
+    columns:
+      - name: order_id
+        description: Primary key for an order.
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: Customer who placed the order.
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_status
+        description: Current order lifecycle status.
+        tests:
+          - not_null
+          - accepted_values:
+              values:
+                - delivered
+                - shipped
+                - invoiced
+                - processing
+                - approved
+                - created
+                - unavailable
+                - canceled
+
+  - name: stg_order_items
+    description: Bronze order items enriched with English category names.
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: order_item_id
+        tests:
+          - not_null
+      - name: line_total_value
+        description: Price plus freight for the line item.
+        tests:
+          - not_null
+
+  - name: stg_customers
+    description: Cleaned and deduplicated customer records.
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+      - name: customer_state
+        description: Two-letter Brazilian state code.
+
+  - name: stg_sellers
+    description: Cleaned and deduplicated seller records.
+    columns:
+      - name: seller_id
+        tests:
+          - unique
+          - not_null
+
+  - name: stg_products
+    description: Product catalog attributes from bronze.
+    columns:
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+
+  - name: int_delivered_order_items
+    description: Delivered order line items ready for gold and fact models.
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: order_item_id
+        tests:
+          - not_null

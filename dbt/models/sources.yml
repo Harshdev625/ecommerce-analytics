@@ -1,0 +1,59 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Raw Olist tables ingested into the bronze layer.
+    database: globalmart
+    schema: bronze
+    freshness:
+      warn_after: { count: 7, period: day }
+      error_after: { count: 30, period: day }
+    loaded_at_field: _ingested_at
+    tables:
+      - name: orders
+        description: Order header records from Olist.
+        columns:
+          - name: order_id
+            description: Primary business key for an order.
+          - name: customer_id
+            description: Foreign key to customers.
+          - name: order_status
+            description: Lifecycle status (delivered, shipped, canceled, etc.).
+
+      - name: order_items
+        description: Line items per order.
+        columns:
+          - name: order_id
+          - name: order_item_id
+          - name: product_id
+          - name: seller_id
+          - name: price
+          - name: freight_value
+
+      - name: customers
+        description: Customer master from Olist.
+
+      - name: sellers
+        description: Seller master from Olist.
+
+      - name: products
+        description: Product catalog from Olist.
+
+      - name: product_category_translation
+        description: Portuguese to English category names.
+
+      - name: order_payments
+        description: Payment rows per order.
+
+      - name: order_reviews
+        description: Customer review scores per order.
+
+  - name: gold
+    description: Existing dimensional tables built outside dbt (M6).
+    database: globalmart
+    schema: gold
+    tables:
+      - name: dim_date
+      - name: dim_product
+      - name: dim_seller
+      - name: dim_customer

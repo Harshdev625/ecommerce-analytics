@@ -23,6 +23,12 @@ data/reports/
 # Secrets
 .env
 *.token
+dbt/profiles.yml
+
+# dbt artifacts
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
 
 # Personal — local only
 Project.md

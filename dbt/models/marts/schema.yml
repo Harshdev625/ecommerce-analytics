@@ -1,0 +1,51 @@
+version: 2
+
+models:
+  - name: mart_daily_sales
+    description: Daily delivered-order revenue aggregates (dbt rebuild of gold daily sales).
+    columns:
+      - name: order_date
+        description: Calendar date of purchase for delivered orders.
+        tests:
+          - unique
+          - not_null
+      - name: order_count
+        description: Distinct delivered orders on the date.
+      - name: daily_revenue
+        description: Sum of line totals for delivered orders on the date.
+      - name: cumulative_revenue
+        description: Running sum of daily revenue ordered by date.
+
+  - name: mart_customer_rfm
+    description: Customer RFM scores and named segments on delivered orders.
+    columns:
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+      - name: rfm_segment
+        description: Named segment derived from R/F/M quintile scores.
+      - name: r_score
+        description: Recency quintile (5 = most recent).
+      - name: f_score
+        description: Frequency quintile (5 = highest order count).
+      - name: m_score
+        description: Monetary quintile (5 = highest spend).
+
+  - name: fact_sales_incremental
+    description: Incremental fact table keyed to existing gold dimensions (Task 9.3).
+    columns:
+      - name: order_id
+        tests:
+          - not_null
+      - name: order_item_id
+        tests:
+          - not_null
+      - name: date_key
+        tests:
+          - not_null
+          - relationships:
+              to: source('gold', 'dim_date')
+              field: date_key
+      - name: total_amount
+        description: Line revenue including freight.

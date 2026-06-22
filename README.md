@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Dimensional model + Delta ops complete (M7 verified on Databricks)  
+**Pipeline status:** Dimensional model + Delta ops complete · **dbt scaffold ready** (M9 — run on Databricks)  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -22,7 +22,9 @@ ecommerce-analytics/
 │   ├── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
 │   ├── m05_gold_analytics/      # Gold aggregations and analytics
 │   ├── m06_dimensional/         # Star schema dimensions and fact table
-│   └── m07_delta_ops/           # Delta OPTIMIZE, partition, VACUUM, time travel
+│   ├── m07_delta_ops/           # Delta OPTIMIZE, partition, VACUUM, time travel
+│   └── m09_dbt/                 # dbt debug, run, test, snapshot
+├── dbt/                         # dbt project (staging, marts, incremental fact)
 ├── src/
 │   ├── ingestion/
 │   ├── quality/
@@ -136,6 +138,16 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `04_time_travel.ipynb` | VERSION AS OF query + RESTORE | verified |
 | `05_liquid_clustering.ipynb` | Liquid CLUSTER BY vs partitioned table | verified |
 
+### dbt — `notebooks/m09_dbt/` + `dbt/`
+
+| Item | Purpose |
+|------|---------|
+| `dbt/` | Sources, staging, marts, incremental fact, snapshot, tests, macros |
+| `dbt/README.md` | Setup, env vars, task-by-task CLI commands |
+| `01_dbt_setup_and_run.ipynb` | Install dbt-databricks, debug dev/prod, run, test, snapshot |
+
+**Requires:** bronze tables + M6 `gold.dim_*` before running `fact_sales_incremental`.
+
 ---
 
 ## Architecture
@@ -160,5 +172,5 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **dbt** | Staging and mart models on Databricks |
+| **dbt** | Run `01_dbt_setup_and_run.ipynb` on Databricks; paste JSON for `Result.md` |
 | **Orchestration** | Databricks Workflows, Airflow, unit tests, dashboard |
