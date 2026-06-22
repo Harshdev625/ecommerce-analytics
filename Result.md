@@ -168,11 +168,11 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 
 ### Silver
 
-`orders`, `orders_late_arrivals`, `order_items`, `customers`, `sellers`
+`orders`, `orders_late_arrivals`, `order_items`, `customers`, `sellers`, `orders_incremental`
 
 ### Gold
 
-Not built yet.
+`daily_sales_metrics`, `customer_rfm`, `category_growth_streaks`, `customer_summary`
 
 ### Metadata
 
@@ -183,6 +183,7 @@ Not built yet.
 | `dead_letter_queue` | Failed records |
 | `reconciliation_log` | Bronze ↔ silver checks |
 | `schema_violation_log` | Schema contract drift |
+| `pipeline_watermarks` | Incremental load high-water marks |
 
 ---
 
@@ -207,6 +208,7 @@ Not built yet.
 | `gold_customer_rfm.json` | Customer RFM segmentation |
 | `gold_category_growth.json` | Category growth streaks |
 | `gold_customer_summary.json` | Customer summary MERGE |
+| `gold_incremental_loader.json` | Incremental loader watermarks |
 
 ---
 
@@ -331,13 +333,24 @@ No **Champions** or **Lost** segments — most customers have exactly one Olist 
 
 MERGE upserts lifetime metrics (`total_orders`, `total_spend`, first/last order dates, AOV) and flips `is_active` when `last_order_date` is before the cutoff.
 
+### Incremental loader
+
+**Report:** `gold_incremental_loader.json` · **Pipeline:** `bronze_orders_to_silver_incremental`  
+**Source → target:** `bronze.orders` → `silver.orders_incremental` · **Watermark table:** `metadata.pipeline_watermarks`
+
+| Run | Previous watermark | New watermark | In batch | New since WM | Target rows | WM advanced |
+|-----|-------------------|---------------|----------|--------------|-------------|-------------|
+| 1 — initial load | — | 2026-06-21 17:55:33 | **99,941** | **99,941** | 99,941 | ✓ |
+| 2 — idempotent rerun | 2026-06-21 17:55:33 | 2026-06-21 17:55:33 | 99,441 | **0** | 99,941 | ✗ |
+
+Run 2 re-reads rows within the 24-hour lookback window (99,441) but advances the watermark only when `_ingested_at` exceeds the previous high-water mark — confirming idempotent incremental behavior.
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Gold analytics** | Incremental loader |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |

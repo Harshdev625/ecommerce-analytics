@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze, Silver, Spark performance, and Joins & CDC built · Gold analytics in progress  
+**Pipeline status:** Bronze, Silver, Spark performance, Joins & CDC, and Gold analytics built · Dimensional model and orchestration not started yet  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -53,7 +53,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 2. Clone this repo into **Databricks Repos**.
 3. Run `config/catalog_setup.sql` — creates `globalmart` catalog, `bronze` / `silver` / `gold` / `metadata` schemas, and volumes.
 4. Upload CSVs to `globalmart.bronze.raw_landing`.
-5. Run notebooks: `m01_bronze` → `m03_silver_quality` → `m02_spark_performance` (silver tables needed for performance notebooks).
+5. Run notebooks in order: `m01_bronze` → `m03_silver_quality` → `m02_spark_performance` → `m04_joins_cdc` → `m05_gold_analytics`.
 
 ### Workflow
 
@@ -108,7 +108,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `02_customer_rfm.ipynb` | RFM quintile scores and named customer segments |
 | `03_category_growth_streaks.ipynb` | Categories with 3+ months consecutive revenue growth |
 | `04_customer_summary_merge.ipynb` | Customer lifetime metrics via Delta MERGE + soft delete |
-| `05_incremental_loader.ipynb` | Watermark-based incremental bronze.orders → silver |
+| `05_incremental_loader.ipynb` | Watermark-based incremental `bronze.orders` → `silver.orders_incremental` |
 
 ---
 
@@ -121,9 +121,9 @@ Bronze (raw) → Silver (quality & entities) → Gold (analytics) → Orchestrat
 | Layer | What's built |
 |-------|----------------|
 | **Bronze** | 8 source tables, Auto Loader orders, nested/flat payments, evolved orders |
-| **Silver** | Orders, late arrivals, order items, customers, sellers |
-| **Metadata** | Ingestion log, DQ results, DLQ, reconciliation log, schema violations |
-| **Gold** | Not started |
+| **Silver** | Orders, late arrivals, order items, customers, sellers, incremental orders |
+| **Gold** | Daily sales, customer RFM, category growth streaks, customer summary |
+| **Metadata** | Ingestion log, DQ results, DLQ, reconciliation log, schema violations, pipeline watermarks |
 
 JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
@@ -133,7 +133,6 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **Gold analytics** | Daily sales, RFM, seller performance, aggregations |
 | **Dimensional model** | Star schema — date/product/seller/customer dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models on Databricks |
