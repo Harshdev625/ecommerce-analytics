@@ -60,6 +60,13 @@ def build_product_dimension_source(
     products = spark.table(config.bronze_products)
     translation = spark.table(config.bronze_translation)
 
+    # Olist source CSV misspells product_name_length as product_name_lenght.
+    name_length = (
+        F.col("product_name_length")
+        if "product_name_length" in products.columns
+        else F.col("product_name_lenght")
+    )
+
     return (
         products.join(
             translation.select("product_category_name", "product_category_name_english"),
@@ -71,6 +78,7 @@ def build_product_dimension_source(
             F.coalesce(F.col("product_category_name_english"), F.lit("unknown")),
         )
         .withColumn("product_sk", hash_surrogate_key(F.col("product_id")))
+        .withColumn("product_name_length", name_length)
         .select(*PRODUCT_DIM_COLUMNS)
         .withColumn("processed_at", F.current_timestamp())
     )
