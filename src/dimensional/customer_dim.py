@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.window import Window
+
+from src.joins.business_questions import SilverJoinTables, load_all_orders
 
 CUSTOMER_DIM_COLUMNS = (
     "customer_sk",
@@ -28,6 +30,53 @@ class CustomerDimConfig:
     source_table: str = "globalmart.silver.customers"
     target_table: str = "globalmart.gold.dim_customer"
     initial_effective_start: str = DEFAULT_EFFECTIVE_START
+    source_tables: SilverJoinTables = field(default_factory=SilverJoinTables)
+
+
+def _delivered_customer_ids(
+    spark: SparkSession,
+    source_tables: SilverJoinTables,
+) -> DataFrame:
+    return (
+        load_all_orders(spark, source_tables)
+        .filter(F.col("order_status") == "delivered")
+        .select("customer_id")
+        .distinct()
+    )
+
+
+def _build_orphan_customer_rows(
+    spark: SparkSession,
+    orphan_ids: DataFrame,
+    dim: DataFrame,
+    config: CustomerDimConfig,
+) -> DataFrame:
+    """Version-1 current rows for customer_ids absent from dim_customer."""
+    silver = spark.table(config.source_table)
+    orphans = orphan_ids.join(silver, "customer_id", "left")
+
+    max_sk = int(dim.agg(F.max("customer_sk")).collect()[0][0] or 0)
+    sk_type = dim.schema["customer_sk"].dataType
+
+    return (
+        orphans.withColumn(
+            "_rn",
+            F.row_number().over(Window.partitionBy(F.lit(1)).orderBy("customer_id")),
+        )
+        .withColumn("customer_sk", (F.col("_rn") + F.lit(max_sk)).cast(sk_type))
+        .withColumn("customer_city", F.coalesce(F.col("customer_city"), F.lit("UNKNOWN")))
+        .withColumn("customer_state", F.coalesce(F.col("customer_state"), F.lit("UN")))
+        .withColumn(
+            "customer_zip_code_prefix",
+            F.coalesce(F.col("customer_zip_code_prefix"), F.lit("00000")),
+        )
+        .withColumn("version_number", F.lit(1))
+        .withColumn("is_current", F.lit(True))
+        .withColumn("effective_start_date", F.lit(config.initial_effective_start).cast("date"))
+        .withColumn("effective_end_date", F.lit(None).cast("date"))
+        .select(*CUSTOMER_DIM_COLUMNS)
+        .withColumn("processed_at", F.current_timestamp())
+    )
 
 
 def build_initial_customer_dimension(
@@ -41,8 +90,20 @@ def build_initial_customer_dimension(
     tracked = ["customer_id", "customer_city", "customer_state", "customer_zip_code_prefix"]
     available = [c for c in tracked if c in customers.columns]
 
+    base = customers.select(*available)
+    delivered_ids = _delivered_customer_ids(spark, config.source_tables)
+    orphan_ids = delivered_ids.join(base.select("customer_id"), "customer_id", "left_anti")
+    if orphan_ids.limit(1).count():
+        stubs = (
+            orphan_ids.withColumn("customer_city", F.lit("UNKNOWN"))
+            .withColumn("customer_state", F.lit("UN"))
+            .withColumn("customer_zip_code_prefix", F.lit("00000"))
+            .select(*available)
+        )
+        base = base.unionByName(stubs)
+
     return (
-        customers.select(*available)
+        base
         .withColumn("version_number", F.lit(1))
         .withColumn("is_current", F.lit(True))
         .withColumn("effective_start_date", F.lit(config.initial_effective_start).cast("date"))
@@ -209,6 +270,27 @@ def ensure_one_current_customer_version(
         "repaired_no_current": promote_count,
         "repaired_multi_current": demote_count,
     }
+
+
+def ensure_delivered_order_customers_in_dim(
+    spark: SparkSession,
+    config: CustomerDimConfig | None = None,
+) -> dict:
+    """Append dim rows for delivered-order customer_ids missing from dim_customer."""
+    config = config or CustomerDimConfig()
+    if not spark.catalog.tableExists(config.target_table):
+        return {"orphan_customers_merged": 0}
+
+    dim = spark.table(config.target_table)
+    delivered_ids = _delivered_customer_ids(spark, config.source_tables)
+    dim_ids = dim.select("customer_id").distinct()
+    orphan_ids = delivered_ids.join(dim_ids, "customer_id", "left_anti")
+    orphan_count = orphan_ids.count()
+    if orphan_count:
+        rows = _build_orphan_customer_rows(spark, orphan_ids, dim, config)
+        rows.write.format("delta").mode("append").saveAsTable(config.target_table)
+
+    return {"orphan_customers_merged": orphan_count}
 
 
 def get_customer_version_history(

@@ -7,7 +7,11 @@ from dataclasses import dataclass, field
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 
-from src.dimensional.customer_dim import CustomerDimConfig, ensure_one_current_customer_version
+from src.dimensional.customer_dim import (
+    CustomerDimConfig,
+    ensure_delivered_order_customers_in_dim,
+    ensure_one_current_customer_version,
+)
 from src.dimensional.product_dim import ProductDimConfig, ensure_order_item_products_in_dim
 from src.joins.business_questions import SilverJoinTables, load_all_orders
 
@@ -55,16 +59,21 @@ def prepare_dimensions_for_fact(
 ) -> dict:
     """Repair common dimension gaps that cause inner-join row loss in fact_sales."""
     config = config or FactSalesConfig()
-    customer_cfg = CustomerDimConfig(target_table=config.dim_customer)
+    customer_cfg = CustomerDimConfig(
+        target_table=config.dim_customer,
+        source_tables=config.source_tables,
+    )
     product_cfg = ProductDimConfig(
         target_table=config.dim_product,
         source_order_items=config.source_items,
     )
 
+    customer_orphans = ensure_delivered_order_customers_in_dim(spark, customer_cfg)
     customer_repair = ensure_one_current_customer_version(spark, customer_cfg)
     product_repair = ensure_order_item_products_in_dim(spark, product_cfg)
 
     return {
+        "customer_orphan_merge": customer_orphans,
         "customer_current_repair": customer_repair,
         "product_orphan_merge": product_repair,
     }
@@ -82,16 +91,24 @@ def diagnose_fact_join_gaps(
     dim_date_keys = spark.table(config.dim_date).select("date_key")
     dim_product = spark.table(config.dim_product).select("product_id")
     dim_seller = spark.table(config.dim_seller).select("seller_id")
-    dim_customer = (
+    dim_customer_current = (
         spark.table(config.dim_customer)
         .filter(F.col("is_current"))
         .select("customer_id")
     )
+    dim_customer_all = spark.table(config.dim_customer).select("customer_id").distinct()
 
     after_date = base.join(dim_date_keys, "date_key", "inner")
     after_product = after_date.join(dim_product, "product_id", "inner")
     after_seller = after_product.join(dim_seller, "seller_id", "inner")
-    after_customer = after_seller.join(dim_customer, "customer_id", "inner")
+    after_customer = after_seller.join(dim_customer_current, "customer_id", "inner")
+
+    missing_customer_not_in_dim = base.join(dim_customer_all, "customer_id", "left_anti").count()
+    missing_customer_not_current = (
+        base.join(dim_customer_all, "customer_id", "inner")
+        .join(dim_customer_current, "customer_id", "left_anti")
+        .count()
+    )
 
     return {
         "delivered_item_count": total,
@@ -101,9 +118,9 @@ def diagnose_fact_join_gaps(
         .count(),
         "missing_product_in_dim": base.join(dim_product, "product_id", "left_anti").count(),
         "missing_seller_in_dim": base.join(dim_seller, "seller_id", "left_anti").count(),
-        "missing_current_customer_in_dim": base.join(
-            dim_customer, "customer_id", "left_anti"
-        ).count(),
+        "missing_customer_not_in_dim": missing_customer_not_in_dim,
+        "missing_customer_not_current": missing_customer_not_current,
+        "missing_current_customer_in_dim": missing_customer_not_in_dim + missing_customer_not_current,
         "rows_after_date_join": after_date.count(),
         "rows_after_product_join": after_product.count(),
         "rows_after_seller_join": after_seller.count(),

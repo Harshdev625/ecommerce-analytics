@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze through Gold analytics built · Dimensional model in progress  
+**Pipeline status:** Bronze through Gold analytics done · Dimensional model in progress (dims + fact; star query pending)  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -120,15 +120,15 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `02_surrogate_key_strategy.ipynb` | Monotonic vs hash SK stability on sellers |
 | `03_product_dimension.ipynb` | Product SCD Type 1 + category conformance |
 | `04_seller_dimension.ipynb` | Seller SCD Type 1 with hash surrogate keys |
-| `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 with version history |
-| `06_fact_sales.ipynb` | Fact table for delivered order items + validations |
+| `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 with version history (serverless-safe) |
+| `06_fact_sales.ipynb` | Fact table for delivered order items + dimension prep + validations |
 
 ---
 
 ## Architecture
 
 ```text
-Bronze (raw) → Silver (quality & entities) → Gold (analytics) → Orchestration
+Bronze (raw) → Silver (quality & entities) → Gold (analytics) → Dimensional (star schema) → Orchestration
 ```
 
 | Layer | What's built |
@@ -136,7 +136,8 @@ Bronze (raw) → Silver (quality & entities) → Gold (analytics) → Orchestrat
 | **Bronze** | 8 source tables, Auto Loader orders, nested/flat payments, evolved orders |
 | **Silver** | Orders, late arrivals, order items, customers, sellers, incremental orders |
 | **Gold** | Daily sales, customer RFM, category growth streaks, customer summary |
-| **Metadata** | Ingestion log, DQ results, DLQ, reconciliation log, schema violations, pipeline watermarks |
+| **Dimensional** | `dim_date`, `dim_product`, `dim_seller`, `dim_customer` (SCD2), `fact_sales` (pending final validation) |
+| **Metadata** | Ingestion log, DQ results, DLQ, reconciliation log, schema violations, pipeline watermarks, category conformance |
 
 JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
@@ -146,7 +147,7 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Star schema — date/product/seller/customer dims + fact table |
+| **Dimensional model** | Re-run fact sales validation (orphan customer merge), then star schema query notebook |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models on Databricks |
 | **Orchestration** | Databricks Workflows, Airflow, unit tests, dashboard |

@@ -415,7 +415,26 @@ Olist bronze typos (`product_name_lenght`, `product_description_lenght`) normali
 | Customers changed | **6** (city suffix ` (SCD2 Updated)`) |
 | SK strategy | Monotonic sequence per version |
 
-Re-run `05_customer_dimension_scd2.ipynb` after latest pull to see **both versions** per changed customer (cached snapshot fix for SCD2 inserts).
+Sample customer `000419c5494106c306a97b5635748086`: **v1 closed** (`Niteroi (CDC Updated)`, end 2026-06-22) → **v2 current** (`Niteroi (CDC Updated) (SCD2 Updated)`). Serverless-safe snapshot via driver `.collect()` (no `.cache()`).
+
+### Fact sales
+
+**Report:** `dimensional_fact_sales.json` · **Table:** `globalmart.gold.fact_sales`
+
+| Metric | Value |
+|--------|-------|
+| Fact rows | **110,191** (expected **110,197**) |
+| Total revenue | **R$15,419,038.02** (expected **R$15,419,773.75**) |
+| FK nulls | **0** on all four dimensions |
+| Join gap | **6** delivered line items — `customer_id` absent from `dim_customer` (orphan orders vs `silver.customers`) |
+
+Fix applied in `src/dimensional/`:
+
+- `ensure_delivered_order_customers_in_dim()` — merges **6 orphan** delivered-order `customer_id`s into `dim_customer` before fact build
+- `build_initial_customer_dimension()` — unions the same stubs on full dim rebuild (notebook 05)
+- `prepare_dimensions_for_fact()` — orphan customer merge → current-flag repair → orphan product merge
+
+**Re-run `06_fact_sales.ipynb`** after Pull; expect **110,197** rows and `all_validations_passed: true`.
 
 ---
 
@@ -423,7 +442,7 @@ Re-run `05_customer_dimension_scd2.ipynb` after latest pull to see **both versio
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Fact table validations, star schema query |
+| **Dimensional model** | Fact sales re-run (orphan customer merge), star schema query |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |
