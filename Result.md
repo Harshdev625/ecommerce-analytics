@@ -204,6 +204,7 @@ Not built yet.
 | `joins_skew_distribution.json` | Skew distribution report |
 | `joins_cdc_customers.json` | CDC customer MERGE simulation |
 | `gold_daily_sales.json` | Gold daily sales metrics |
+| `gold_customer_rfm.json` | Customer RFM segmentation |
 
 ---
 
@@ -288,13 +289,31 @@ MERGE handles delete, update (city/state/zip + `processed_at`), and insert on `c
 
 Metrics include cumulative revenue, DoD change (abs + %), and within-month revenue rank.
 
+### Customer RFM
+
+**Report:** `gold_customer_rfm.json` · **Table:** `globalmart.gold.customer_rfm` · **Reference date:** 2018-08-29
+
+| Metric | Value |
+|--------|-------|
+| Customers scored | **96,478** |
+| Top spender | R$13,664.08 (1 order — At Risk by recency) |
+
+| Segment | Customers | Avg spend (R$) | Avg recency (days) |
+|---------|-----------|----------------|--------------------|
+| Potential | 38,592 | 163.77 | 92 |
+| At Risk | 38,590 | 160.56 | 397 |
+| Loyal | 11,699 | 70.83 | 222 |
+| Needs Attention | 7,597 | 273.10 | 223 |
+
+No **Champions** or **Lost** segments — most customers have exactly one Olist order (`frequency = 1`), so F-score quintiles collapse and high-R/high-M thresholds rarely co-occur.
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Gold analytics** | RFM, category growth streaks, customer summary MERGE, incremental loader |
+| **Gold analytics** | Category growth streaks, customer summary MERGE, incremental loader |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
