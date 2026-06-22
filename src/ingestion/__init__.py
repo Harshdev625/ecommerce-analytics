@@ -3,13 +3,17 @@
 from src.ingestion.idempotent_loader import (
     IngestionConfig,
     IngestionResult,
-    ingest_landing_zone,
     build_ingestion_summary,
+    build_run_report,
+    ingest_landing_zone,
+    save_run_report_to_volume,
 )
 
 __all__ = [
     "IngestionConfig",
     "IngestionResult",
-    "ingest_landing_zone",
     "build_ingestion_summary",
+    "build_run_report",
+    "ingest_landing_zone",
+    "save_run_report_to_volume",
 ]

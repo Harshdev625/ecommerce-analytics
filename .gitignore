@@ -14,13 +14,11 @@ data/raw/*
 !data/raw/.gitkeep
 data/extracted/*
 !data/extracted/.gitkeep
+data/reports/
 *.csv
 *.parquet
 *.delta
 *.zip
-
-# Run reports (generated from Databricks — safe to commit, row counts only)
-# reports/ingestion_latest.json is written by the bronze notebook
 
 # Secrets
 .env

@@ -22,4 +22,8 @@ CREATE SCHEMA IF NOT EXISTS metadata
 CREATE VOLUME IF NOT EXISTS globalmart.bronze.raw_landing
   COMMENT 'Landing zone for Olist CSV source files';
 
+-- Optional: pipeline run summaries (JSON) — no personal paths
+CREATE VOLUME IF NOT EXISTS globalmart.metadata.run_reports
+  COMMENT 'Exported run summaries from notebooks';
+
 SHOW SCHEMAS IN globalmart;

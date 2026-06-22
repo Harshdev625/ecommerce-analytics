@@ -335,28 +335,21 @@ def build_run_report(
     }
 
 
-def _workspace_path(path: str) -> str:
-    """Databricks Repos imports use /Repos/...; file I/O needs /Workspace/Repos/..."""
-    if path.startswith("/Repos/"):
-        return f"/Workspace{path}"
-    return path
+RUN_REPORT_VOLUME_PATH = (
+    "/Volumes/globalmart/metadata/run_reports/ingestion_latest.json"
+)
 
 
-def write_run_report(report: dict, output_path: str, dbutils=None) -> str:
-    """Write report JSON to repo path, Databricks Workspace, or local disk."""
+def save_run_report_to_volume(
+    report: dict,
+    dbutils,
+    output_path: str = RUN_REPORT_VOLUME_PATH,
+) -> str:
+    """Save JSON to a Unity Catalog volume (no personal workspace paths)."""
     import json
-    from pathlib import Path
 
     payload = json.dumps(report, indent=2)
-    resolved = _workspace_path(output_path)
-
-    if dbutils is not None:
-        parent = "/".join(resolved.split("/")[:-1])
-        dbutils.fs.mkdirs(f"file:{parent}")
-        dbutils.fs.put(f"file:{resolved}", payload, True)
-        return resolved
-
-    path = Path(resolved)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(payload, encoding="utf-8")
-    return str(path)
+    parent = "/".join(output_path.split("/")[:-1])
+    dbutils.fs.mkdirs(parent)
+    dbutils.fs.put(output_path, payload, overwrite=True)
+    return output_path
