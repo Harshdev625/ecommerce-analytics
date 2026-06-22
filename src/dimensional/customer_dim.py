@@ -86,12 +86,13 @@ def apply_scd2_customer_changes(
     if not change_ids:
         return {"customers_changed": 0, "versions_added": 0, "change_ids": []}
 
-    max_sk = dim.agg(F.max("customer_sk")).collect()[0][0] or 0
+    max_sk = int(dim.agg(F.max("customer_sk")).collect()[0][0] or 0)
+    sk_type = spark.table(config.target_table).schema["customer_sk"].dataType
 
     close_keys = spark.createDataFrame(
         [(r["customer_sk"],) for r in rows],
         ["customer_sk"],
-    )
+    ).withColumn("customer_sk", F.col("customer_sk").cast(sk_type))
 
     from delta.tables import DeltaTable
 
@@ -123,10 +124,11 @@ def apply_scd2_customer_changes(
     new_versions = (
         spark.createDataFrame(
             new_version_rows,
-            "customer_sk long, customer_id string, customer_city string, "
+            "customer_sk int, customer_id string, customer_city string, "
             "customer_state string, customer_zip_code_prefix string, "
             "version_number int, is_current boolean",
         )
+        .withColumn("customer_sk", F.col("customer_sk").cast(sk_type))
         .withColumn("effective_start_date", F.current_date())
         .withColumn("effective_end_date", F.lit(None).cast("date"))
         .select(*CUSTOMER_DIM_COLUMNS)
