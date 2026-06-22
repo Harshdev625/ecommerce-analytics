@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze, Silver, Spark performance, and Joins & CDC built · Gold and orchestration not started yet  
+**Pipeline status:** Bronze, Silver, Spark performance, and Joins & CDC built · Gold analytics in progress  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -19,13 +19,15 @@ ecommerce-analytics/
 │   ├── m01_bronze/              # Raw ingestion
 │   ├── m03_silver_quality/      # Quality gates & silver entities
 │   ├── m02_spark_performance/   # Query plan & skew analysis
-│   └── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
+│   ├── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
+│   └── m05_gold_analytics/      # Gold aggregations and analytics
 ├── src/
 │   ├── ingestion/
 │   ├── quality/
 │   ├── transformations/
 │   ├── spark_performance/
-│   └── joins/
+│   ├── joins/
+│   └── gold/
 └── data/
     ├── raw/
     └── extracted/
@@ -97,6 +99,12 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `02_broadcast_join_control.ipynb` | Default vs sort-merge vs broadcast join comparison |
 | `03_skew_distribution_report.ipynb` | Top-10 skewed keys on `seller_id` and `product_id` |
 | `04_cdc_customers_merge.ipynb` | CDC batch + Delta MERGE on `silver.customers` |
+
+### Gold analytics — `notebooks/m05_gold_analytics/`
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_daily_sales_metrics.ipynb` | Daily revenue, cumulative totals, MAs, DoD change, monthly rank |
 
 ---
 
