@@ -70,15 +70,16 @@ def apply_scd2_customer_changes(
         dim.filter(F.col("is_current"))
         .orderBy("customer_id")
         .limit(change_count)
+        .cache()
     )
     change_ids = [r["customer_id"] for r in current_rows.select("customer_id").collect()]
     if not change_ids:
+        current_rows.unpersist()
         return {"customers_changed": 0, "versions_added": 0, "change_ids": []}
 
     max_sk = dim.agg(F.max("customer_sk")).collect()[0][0] or 0
 
     close_keys = current_rows.select("customer_sk")
-    close_keys.createOrReplaceTempView("scd2_close_keys")
 
     from delta.tables import DeltaTable
 
@@ -109,6 +110,7 @@ def apply_scd2_customer_changes(
     )
 
     new_versions.write.format("delta").mode("append").saveAsTable(config.target_table)
+    current_rows.unpersist()
 
     return {
         "customers_changed": len(change_ids),

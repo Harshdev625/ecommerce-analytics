@@ -172,7 +172,7 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 
 ### Gold
 
-`dim_date`, `dim_product`, `dim_seller`, `daily_sales_metrics`, `customer_rfm`, `category_growth_streaks`, `customer_summary`
+`dim_date`, `dim_product`, `dim_seller`, `dim_customer`, `daily_sales_metrics`, ...
 
 ### Metadata
 
@@ -213,6 +213,7 @@ HO returns one row per order (zeros when no match); explode + groupBy only emits
 | `dimensional_surrogate_keys.json` | Surrogate key strategy tests |
 | `dimensional_product.json` | Product dimension SCD Type 1 |
 | `dimensional_seller.json` | Seller dimension SCD Type 1 |
+| `dimensional_customer.json` | Customer dimension SCD Type 2 |
 
 ---
 
@@ -402,13 +403,27 @@ Olist bronze typos (`product_name_lenght`, `product_description_lenght`) normali
 | Sellers | **3,095** (distinct) |
 | SK strategy | Deterministic hash (salt=`seller`) |
 
+### Customer dimension (SCD Type 2)
+
+**Report:** `dimensional_customer.json` · **Table:** `globalmart.gold.dim_customer`
+
+| Metric | Value |
+|--------|-------|
+| Rows after initial load | **99,441** |
+| Rows after SCD2 simulation | **99,447** (+6 versions) |
+| Current customers | **99,441** |
+| Customers changed | **6** (city suffix ` (SCD2 Updated)`) |
+| SK strategy | Monotonic sequence per version |
+
+Re-run `05_customer_dimension_scd2.ipynb` after latest pull to see **both versions** per changed customer (cached snapshot fix for SCD2 inserts).
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Dimensional model** | Customer dim (SCD2), fact table, star query |
+| **Dimensional model** | Fact table validations, star schema query |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
 | **Orchestration** | Workflows, Airflow, unit tests, dashboard |

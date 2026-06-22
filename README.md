@@ -121,6 +121,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `03_product_dimension.ipynb` | Product SCD Type 1 + category conformance |
 | `04_seller_dimension.ipynb` | Seller SCD Type 1 with hash surrogate keys |
 | `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 with version history |
+| `06_fact_sales.ipynb` | Fact table for delivered order items + validations |
 
 ---
 
