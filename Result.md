@@ -206,6 +206,7 @@ Not built yet.
 | `gold_daily_sales.json` | Gold daily sales metrics |
 | `gold_customer_rfm.json` | Customer RFM segmentation |
 | `gold_category_growth.json` | Category growth streaks |
+| `gold_customer_summary.json` | Customer summary MERGE |
 
 ---
 
@@ -319,13 +320,24 @@ No **Champions** or **Lost** segments — most customers have exactly one Olist 
 | Longest streak | **7 months** — `construction_tools_construction` (2017-05 → 2017-11, +5,654%) |
 | Notable 6-month streaks | `auto`, `cool_stuff`, `furniture_bedroom`, `health_beauty` |
 
+### Customer summary MERGE
+
+**Report:** `gold_customer_summary.json` · **Table:** `globalmart.gold.customer_summary` · **Reference date:** 2018-08-29
+
+| Pass | Inactive rule | Inserts | Updates | Soft-deleted | Active | Inactive |
+|------|---------------|---------|---------|--------------|--------|----------|
+| 1 — initial load | 9,999 days (all active) | **96,478** | 0 | 0 | 96,478 | 0 |
+| 2 — inactivity refresh | 180 days (cutoff 2018-03-02) | 0 | **57,587** | **57,587** | 38,891 | 57,587 |
+
+MERGE upserts lifetime metrics (`total_orders`, `total_spend`, first/last order dates, AOV) and flips `is_active` when `last_order_date` is before the cutoff.
+
 ---
 
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Gold analytics** | Customer summary MERGE, incremental loader |
+| **Gold analytics** | Incremental loader |
 | **Dimensional model** | Star schema — dims + fact table |
 | **Delta ops** | OPTIMIZE, partitioning, Z-order, VACUUM, time travel |
 | **dbt** | Staging and mart models |
