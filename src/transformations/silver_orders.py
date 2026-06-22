@@ -35,16 +35,17 @@ def build_silver_orders(
     config = config or SilverOrdersConfig()
     bronze = source_df if source_df is not None else spark.table(config.bronze_table)
 
-    # Keep latest version per order (handles schema-evolution re-appends)
-    w = Window.partitionBy("order_id").orderBy(
-        F.col("order_channel").isNull(),
-        F.col("_ingested_at").desc_nulls_last(),
-    )
-    bronze = (
-        bronze.withColumn("_dedupe_rank", F.row_number().over(w))
-        .filter(F.col("_dedupe_rank") == 1)
-        .drop("_dedupe_rank")
-    )
+    # Dedupe only when reading full bronze table (notebook may pass pre-deduped source_df)
+    if source_df is None:
+        w = Window.partitionBy("order_id").orderBy(
+            F.col("order_channel").isNull(),
+            F.col("_ingested_at").desc_nulls_last(),
+        )
+        bronze = (
+            bronze.withColumn("_dedupe_rank", F.row_number().over(w))
+            .filter(F.col("_dedupe_rank") == 1)
+            .drop("_dedupe_rank")
+        )
 
     ts_cols = [
         "order_purchase_timestamp",
