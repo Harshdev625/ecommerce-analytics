@@ -66,20 +66,32 @@ def apply_scd2_customer_changes(
     config = config or CustomerDimConfig()
     dim = spark.table(config.target_table)
 
-    current_rows = (
+    snapshot_cols = [
+        "customer_sk",
+        "customer_id",
+        "customer_city",
+        "customer_state",
+        "customer_zip_code_prefix",
+        "version_number",
+    ]
+    # Collect the small change set once (serverless does not support .cache()/PERSIST).
+    rows = (
         dim.filter(F.col("is_current"))
         .orderBy("customer_id")
         .limit(change_count)
-        .cache()
+        .select(*snapshot_cols)
+        .collect()
     )
-    change_ids = [r["customer_id"] for r in current_rows.select("customer_id").collect()]
+    change_ids = [r["customer_id"] for r in rows]
     if not change_ids:
-        current_rows.unpersist()
         return {"customers_changed": 0, "versions_added": 0, "change_ids": []}
 
     max_sk = dim.agg(F.max("customer_sk")).collect()[0][0] or 0
 
-    close_keys = current_rows.select("customer_sk")
+    close_keys = spark.createDataFrame(
+        [(r["customer_sk"],) for r in rows],
+        ["customer_sk"],
+    )
 
     from delta.tables import DeltaTable
 
@@ -95,22 +107,33 @@ def apply_scd2_customer_changes(
         },
     ).execute()
 
+    sorted_rows = sorted(rows, key=lambda r: r["customer_id"])
+    new_version_rows = [
+        (
+            max_sk + idx,
+            r["customer_id"],
+            r["customer_city"] + city_suffix,
+            r["customer_state"],
+            r["customer_zip_code_prefix"],
+            int(r["version_number"]) + 1,
+            True,
+        )
+        for idx, r in enumerate(sorted_rows, start=1)
+    ]
     new_versions = (
-        current_rows.withColumn("customer_city", F.concat(F.col("customer_city"), F.lit(city_suffix)))
-        .withColumn("version_number", F.col("version_number") + 1)
-        .withColumn("is_current", F.lit(True))
+        spark.createDataFrame(
+            new_version_rows,
+            "customer_sk long, customer_id string, customer_city string, "
+            "customer_state string, customer_zip_code_prefix string, "
+            "version_number int, is_current boolean",
+        )
         .withColumn("effective_start_date", F.current_date())
         .withColumn("effective_end_date", F.lit(None).cast("date"))
-        .withColumn(
-            "customer_sk",
-            F.row_number().over(Window.partitionBy(F.lit(1)).orderBy("customer_id")) + F.lit(max_sk),
-        )
         .select(*CUSTOMER_DIM_COLUMNS)
         .withColumn("processed_at", F.current_timestamp())
     )
 
     new_versions.write.format("delta").mode("append").saveAsTable(config.target_table)
-    current_rows.unpersist()
 
     return {
         "customers_changed": len(change_ids),
