@@ -45,7 +45,9 @@ Models land in:
 |-------|---------------------|
 | Staging views | `globalmart.dbt_dev_staging` |
 | Marts / fact | `globalmart.dbt_dev_marts` |
-| Snapshots | `globalmart.dbt_dev_snapshots` |
+| Snapshots | `globalmart.dbt_dev.snap_customers` (dev target schema) |
+
+Older runs may have created `globalmart.snapshots.snap_customers` before the schema fix.
 
 Prod uses `dbt_prod_*` schemas when `--target prod`.
 

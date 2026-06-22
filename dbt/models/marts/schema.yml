@@ -45,7 +45,8 @@ models:
         tests:
           - not_null
           - relationships:
-              to: source('gold', 'dim_date')
-              field: date_key
+              arguments:
+                to: source('gold', 'dim_date')
+                field: date_key
       - name: total_amount
         description: Line revenue including freight.

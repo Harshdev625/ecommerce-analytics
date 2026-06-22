@@ -30,7 +30,3 @@ models:
     dimensional:
       +materialized: table
       +schema: marts
-
-snapshots:
-  globalmart:
-    +target_schema: snapshots
