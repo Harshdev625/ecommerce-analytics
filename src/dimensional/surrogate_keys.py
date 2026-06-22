@@ -32,19 +32,28 @@ class SurrogateKeyConfig:
     natural_key: str = "seller_id"
 
 
-def assign_sk_monotonic(df: DataFrame, natural_key: str) -> DataFrame:
-    """Spark monotonically_increasing_id — fast but not stable across runs."""
-    return df.select(natural_key).distinct().withColumn(
-        "sk_monotonic",
-        F.monotonically_increasing_id(),
+def assign_sk_monotonic(
+    df: DataFrame,
+    natural_key: str,
+    num_partitions: int = 1,
+) -> DataFrame:
+    """Spark monotonically_increasing_id — partition layout affects assigned IDs."""
+    return (
+        df.select(natural_key)
+        .distinct()
+        .repartition(num_partitions)
+        .withColumn("sk_monotonic", F.monotonically_increasing_id())
     )
 
 
 def assign_sk_row_number(df: DataFrame, natural_key: str) -> DataFrame:
     """Deterministic ordering by natural key — stable for a fixed dataset."""
-    ordered = df.select(natural_key).distinct().orderBy(natural_key)
-    window = Window.orderBy(natural_key)
-    return ordered.withColumn("sk_row_number", F.row_number().over(window))
+    window = Window.partitionBy(F.lit(1)).orderBy(natural_key)
+    return (
+        df.select(natural_key)
+        .distinct()
+        .withColumn("sk_row_number", F.row_number().over(window))
+    )
 
 
 def assign_sk_hash(df: DataFrame, natural_key: str, salt: str = "globalmart") -> DataFrame:
@@ -83,23 +92,32 @@ def run_surrogate_key_tests(
     config = config or SurrogateKeyConfig()
     source = spark.table(config.source_table)
 
-    mono_a = assign_sk_monotonic(source, config.natural_key)
-    mono_b = assign_sk_monotonic(source, config.natural_key)
+    mono_same_a = assign_sk_monotonic(source, config.natural_key, num_partitions=1)
+    mono_same_b = assign_sk_monotonic(source, config.natural_key, num_partitions=1)
+    mono_repart_a = assign_sk_monotonic(source, config.natural_key, num_partitions=4)
+    mono_repart_b = assign_sk_monotonic(source, config.natural_key, num_partitions=16)
     row_a = assign_sk_row_number(source, config.natural_key)
     row_b = assign_sk_row_number(source, config.natural_key)
     hash_a = assign_sk_hash(source, config.natural_key)
     hash_b = assign_sk_hash(source, config.natural_key)
 
-    mono_result = _stability_check(mono_a, mono_b, config.natural_key, "sk_monotonic")
-    row_result = _stability_check(row_a, row_b, config.natural_key, "sk_row_number")
-    hash_result = _stability_check(hash_a, hash_b, config.natural_key, "sk_hash")
+    tests = [
+        {**_stability_check(mono_same_a, mono_same_b, config.natural_key, "sk_monotonic"), "scenario": "identical_plan_same_session"},
+        {**_stability_check(mono_repart_a, mono_repart_b, config.natural_key, "sk_monotonic"), "scenario": "different_repartition_4_vs_16"},
+        {**_stability_check(row_a, row_b, config.natural_key, "sk_row_number"), "scenario": "repeat_run"},
+        {**_stability_check(hash_a, hash_b, config.natural_key, "sk_hash"), "scenario": "repeat_run"},
+    ]
 
     return {
         "task": "surrogate_key_strategy",
         "source_table": config.source_table,
         "natural_key": config.natural_key,
-        "tests": [mono_result, row_result, hash_result],
+        "tests": tests,
         "strategy_decisions": SK_ANALYSIS,
+        "monotonic_note": (
+            "monotonically_increasing_id() embeds partition id — IDs shift when shuffle/"
+            "repartition layout changes even if the natural key set is unchanged."
+        ),
         "sample_keys": [
             row.asDict()
             for row in hash_a.orderBy(config.natural_key).limit(5).collect()

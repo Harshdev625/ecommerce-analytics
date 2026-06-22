@@ -364,6 +364,21 @@ Run 2 re-reads rows within the 24-hour lookback window (99,441) but advances the
 
 Uses `date_key` (YYYYMMDD integer) as the primary key — no separate surrogate needed.
 
+### Surrogate key strategy
+
+**Report:** `dimensional_surrogate_keys.json` · **Test entity:** `silver.sellers` (3,095 rows)
+
+| Strategy | Scenario | Stable? | Mismatches |
+|----------|----------|---------|------------|
+| `monotonically_increasing_id()` | Identical plan, same session | ✓ | 0 |
+| `monotonically_increasing_id()` | Repartition 4 vs 16 | ✗ (expected) | >0 after fix |
+| `row_number()` by natural key | Repeat run | ✓ | 0 |
+| Hash of natural key | Repeat run | ✓ | 0 |
+
+**Decisions:** SCD Type 1 → **hash SK** · SCD Type 2 → **monotonic sequence per version** · Date dim → **`date_key`** (no surrogate)
+
+Note: `monotonically_increasing_id()` can look stable in a same-session micro-benchmark but shifts when partition layout changes — unsuitable for SCD Type 1 reloads.
+
 ---
 
 ## Not yet built
