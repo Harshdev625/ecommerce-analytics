@@ -119,6 +119,73 @@ def apply_scd2_customer_changes(
     }
 
 
+def ensure_one_current_customer_version(
+    spark: SparkSession,
+    config: CustomerDimConfig | None = None,
+) -> dict:
+    """Ensure each customer_id has exactly one is_current=true row (max version wins)."""
+    from delta.tables import DeltaTable
+
+    config = config or CustomerDimConfig()
+    if not spark.catalog.tableExists(config.target_table):
+        return {"repaired_no_current": 0, "repaired_multi_current": 0}
+
+    dim = spark.table(config.target_table)
+    w_desc = Window.partitionBy("customer_id").orderBy(F.col("version_number").desc())
+
+    no_current_ids = (
+        dim.groupBy("customer_id")
+        .agg(F.max(F.when(F.col("is_current"), 1).otherwise(0)).alias("has_current"))
+        .filter(F.col("has_current") == 0)
+        .select("customer_id")
+    )
+    promote_sk = (
+        dim.join(no_current_ids, "customer_id", "inner")
+        .withColumn("_rank", F.row_number().over(w_desc))
+        .filter(F.col("_rank") == 1)
+        .select("customer_sk")
+    )
+
+    demote_sk = (
+        dim.filter(F.col("is_current"))
+        .withColumn("_rank", F.row_number().over(w_desc))
+        .filter(F.col("_rank") > 1)
+        .select("customer_sk")
+    )
+
+    promote_count = promote_sk.count()
+    demote_count = demote_sk.count()
+
+    delta = DeltaTable.forName(spark, config.target_table).alias("t")
+    if promote_count:
+        delta.merge(
+            promote_sk.alias("s"),
+            "t.customer_sk = s.customer_sk",
+        ).whenMatchedUpdate(
+            set={
+                "is_current": "true",
+                "effective_end_date": "cast(null as date)",
+                "processed_at": "current_timestamp()",
+            }
+        ).execute()
+
+    if demote_count:
+        delta.merge(
+            demote_sk.alias("s"),
+            "t.customer_sk = s.customer_sk",
+        ).whenMatchedUpdate(
+            set={
+                "is_current": "false",
+                "processed_at": "current_timestamp()",
+            }
+        ).execute()
+
+    return {
+        "repaired_no_current": promote_count,
+        "repaired_multi_current": demote_count,
+    }
+
+
 def get_customer_version_history(
     spark: SparkSession,
     customer_id: str,
@@ -144,6 +211,7 @@ def run_customer_dimension(
 
     row_count_after_initial = spark.table(config.target_table).count()
     scd2_meta = apply_scd2_customer_changes(spark, config, change_count=change_count)
+    current_repair = ensure_one_current_customer_version(spark, config)
 
     written = spark.table(config.target_table)
     sample_id = scd2_meta["change_ids"][0] if scd2_meta["change_ids"] else None
@@ -172,6 +240,7 @@ def run_customer_dimension(
             .count()
         ),
         "scd2_simulation": scd2_meta,
+        "current_flag_repair": current_repair,
         "sample_customer_version_history": {
             "customer_id": sample_id,
             "versions": version_history,

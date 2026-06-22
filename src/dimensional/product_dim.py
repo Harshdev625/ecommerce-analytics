@@ -48,6 +48,7 @@ def _bronze_col(df: DataFrame, canonical: str) -> F.Column:
 class ProductDimConfig:
     bronze_products: str = "globalmart.bronze.products"
     bronze_translation: str = "globalmart.bronze.product_category_translation"
+    source_order_items: str = "globalmart.silver.order_items"
     target_table: str = "globalmart.gold.dim_product"
     conformance_table: str = CATEGORY_CONFORMANCE_TABLE
 
@@ -104,6 +105,49 @@ def build_product_dimension_source(
         .select(*PRODUCT_DIM_COLUMNS)
         .withColumn("processed_at", F.current_timestamp())
     )
+
+
+def build_orphan_product_rows(
+    spark: SparkSession,
+    config: ProductDimConfig | None = None,
+) -> DataFrame:
+    """Products referenced in order_items but absent from bronze.products."""
+    config = config or ProductDimConfig()
+    items = spark.table(config.source_order_items).select("product_id").distinct()
+    bronze_ids = spark.table(config.bronze_products).select("product_id").distinct()
+    orphan_ids = items.join(bronze_ids, "product_id", "left_anti")
+
+    return (
+        orphan_ids.withColumn("product_category_name", F.lit(None).cast("string"))
+        .withColumn("category_name_en", F.lit("unknown"))
+        .withColumn("product_name_length", F.lit(None).cast("int"))
+        .withColumn("product_description_length", F.lit(None).cast("int"))
+        .withColumn("product_photos_qty", F.lit(None).cast("int"))
+        .withColumn("product_weight_g", F.lit(None).cast("int"))
+        .withColumn("product_length_cm", F.lit(None).cast("int"))
+        .withColumn("product_height_cm", F.lit(None).cast("int"))
+        .withColumn("product_width_cm", F.lit(None).cast("int"))
+        .withColumn("product_sk", hash_surrogate_key(F.col("product_id")))
+        .select(*PRODUCT_DIM_COLUMNS)
+        .withColumn("processed_at", F.current_timestamp())
+    )
+
+
+def ensure_order_item_products_in_dim(
+    spark: SparkSession,
+    config: ProductDimConfig | None = None,
+) -> dict:
+    """Merge any order_items product_ids missing from dim_product."""
+    config = config or ProductDimConfig()
+    if not spark.catalog.tableExists(config.target_table):
+        return {"orphan_products_merged": 0}
+
+    orphans = build_orphan_product_rows(spark, config)
+    orphan_count = orphans.count()
+    if orphan_count:
+        apply_product_dimension_merge(spark, orphans, config)
+
+    return {"orphan_products_merged": orphan_count}
 
 
 def validate_category_conformance(
