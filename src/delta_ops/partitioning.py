@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 from dataclasses import dataclass
 
 from pyspark.sql import DataFrame, SparkSession
@@ -74,6 +76,7 @@ def partition_prune_explain(
     spark: SparkSession,
     config: PartitionStrategyConfig | None = None,
 ) -> str:
+    """Capture explain plan without _jdf (serverless-safe)."""
     config = config or PartitionStrategyConfig()
     df = (
         spark.table(config.partitioned_table)
@@ -81,7 +84,10 @@ def partition_prune_explain(
         .groupBy(config.partition_column)
         .agg(F.round(F.sum("total_amount"), 2).alias("revenue"))
     )
-    return df._jdf.queryExecution().toString()
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        df.explain(mode="extended")
+    return buffer.getvalue()
 
 
 def run_partition_zorder_strategy(
