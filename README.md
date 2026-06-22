@@ -62,6 +62,7 @@ The `data/` directory is gitignored. Upload the CSVs to Databricks after running
 | `01_idempotent_ingestion.ipynb` | Batch load 8 CSVs with fingerprint idempotency |
 | `02_auto_loader_orders.ipynb` | Auto Loader for orders with checkpoint idempotency |
 | `03_nested_payments.ipynb` | Nested + flattened payment representations |
+| `04_schema_evolution.ipynb` | Orders schema evolution + validation log |
 
 ## Architecture
 
