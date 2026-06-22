@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Bronze, Silver, Spark performance, Joins & CDC, and Gold analytics built · Dimensional model and orchestration not started yet  
+**Pipeline status:** Bronze through Gold analytics built · Dimensional model in progress  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -20,14 +20,16 @@ ecommerce-analytics/
 │   ├── m03_silver_quality/      # Quality gates & silver entities
 │   ├── m02_spark_performance/   # Query plan & skew analysis
 │   ├── m04_joins_cdc/           # Business joins, broadcast control, CDC MERGE
-│   └── m05_gold_analytics/      # Gold aggregations and analytics
+│   ├── m05_gold_analytics/      # Gold aggregations and analytics
+│   └── m06_dimensional/         # Star schema dimensions and fact table
 ├── src/
 │   ├── ingestion/
 │   ├── quality/
 │   ├── transformations/
 │   ├── spark_performance/
 │   ├── joins/
-│   └── gold/
+│   ├── gold/
+│   └── dimensional/
 └── data/
     ├── raw/
     └── extracted/
@@ -53,7 +55,7 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 2. Clone this repo into **Databricks Repos**.
 3. Run `config/catalog_setup.sql` — creates `globalmart` catalog, `bronze` / `silver` / `gold` / `metadata` schemas, and volumes.
 4. Upload CSVs to `globalmart.bronze.raw_landing`.
-5. Run notebooks in order: `m01_bronze` → `m03_silver_quality` → `m02_spark_performance` → `m04_joins_cdc` → `m05_gold_analytics`.
+5. Run notebooks in order through `m05_gold_analytics`, then `m06_dimensional` for the star schema.
 
 ### Workflow
 
@@ -109,6 +111,12 @@ Required files: `olist_orders_dataset.csv`, `olist_order_items_dataset.csv`, `ol
 | `03_category_growth_streaks.ipynb` | Categories with 3+ months consecutive revenue growth |
 | `04_customer_summary_merge.ipynb` | Customer lifetime metrics via Delta MERGE + soft delete |
 | `05_incremental_loader.ipynb` | Watermark-based incremental `bronze.orders` → `silver.orders_incremental` |
+
+### Dimensional model — `notebooks/m06_dimensional/`
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_date_dimension.ipynb` | Calendar + fiscal date dimension (2016–2020) |
 
 ---
 
