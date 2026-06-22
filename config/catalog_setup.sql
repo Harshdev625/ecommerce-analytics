@@ -26,4 +26,10 @@ CREATE VOLUME IF NOT EXISTS globalmart.bronze.raw_landing
 CREATE VOLUME IF NOT EXISTS globalmart.metadata.run_reports
   COMMENT 'Exported run summaries from notebooks';
 
+CREATE VOLUME IF NOT EXISTS globalmart.bronze.orders_autoloader_in
+  COMMENT 'Auto Loader input folder for orders CSV';
+
+CREATE VOLUME IF NOT EXISTS globalmart.metadata.checkpoints
+  COMMENT 'Auto Loader checkpoint and schema tracking';
+
 SHOW SCHEMAS IN globalmart;
