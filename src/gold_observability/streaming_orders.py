@@ -16,6 +16,14 @@ class StreamingOrdersConfig:
     bronze_orders: str = "globalmart.bronze.orders"
 
 
+STREAM_ORDER_COLUMNS = (
+    "order_id",
+    "customer_id",
+    "order_status",
+    "order_purchase_timestamp",
+)
+
+
 def ensure_orders_stream_table(spark: SparkSession, config: StreamingOrdersConfig | None = None) -> None:
     config = config or StreamingOrdersConfig()
     spark.sql(
@@ -41,9 +49,15 @@ def run_orders_stream_once(spark: SparkSession, config: StreamingOrdersConfig | 
         spark.read.format("csv")
         .option("header", True)
         .load(config.source_path)
+        .select(*STREAM_ORDER_COLUMNS)
         .withColumn("_stream_ingested_at", F.current_timestamp())
     )
-    batch.write.format("delta").mode("overwrite").saveAsTable(config.target_table)
+    (
+        batch.write.format("delta")
+        .mode("overwrite")
+        .option("overwriteSchema", "true")
+        .saveAsTable(config.target_table)
+    )
 
     stream_count = spark.table(config.target_table).count()
     bronze_count = spark.table(config.bronze_orders).count()
