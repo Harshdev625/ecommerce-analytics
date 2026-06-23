@@ -122,19 +122,29 @@ def run_silver_transforms_task(spark: SparkSession, params: PipelineParams) -> d
         "silver_orders": orders_cfg.silver_table,
         "silver_orders_count": on_time.count(),
         "late_arrivals_count": late.count(),
+        "silver_combined_count": on_time.count() + late.count(),
         "silver_order_items_count": order_items.count(),
         "customer_stats": cust_stats,
         "seller_stats": seller_stats,
+        "note": (
+            "Historical Olist orders vs recent _ingested_at often classify as very_late; "
+            "late_arrivals holds them but load_all_orders() unions both for downstream gold."
+        ),
     }
+
+
+def _silver_order_keys(spark: SparkSession, orders_cfg: SilverOrdersConfig):
+    on_time = spark.table(orders_cfg.silver_table).select("order_id")
+    late = spark.table(orders_cfg.late_arrivals_table).select("order_id")
+    return on_time.unionByName(late).distinct()
 
 
 def run_reconciliation_task(spark: SparkSession, params: PipelineParams) -> dict:
     orders_cfg = SilverOrdersConfig()
     bronze_deduped = _dedupe_bronze_orders(spark, orders_cfg.bronze_table)
-    silver = spark.table(orders_cfg.silver_table)
 
     source_keys = bronze_deduped.select("order_id").distinct()
-    target_keys = silver.select("order_id").distinct()
+    target_keys = _silver_order_keys(spark, orders_cfg)
 
     if params.dry_run:
         return {
@@ -148,7 +158,7 @@ def run_reconciliation_task(spark: SparkSession, params: PipelineParams) -> dict
         source_keys,
         target_keys,
         source_table=orders_cfg.bronze_table,
-        target_table=orders_cfg.silver_table,
+        target_table="globalmart.silver.orders_combined",
         key_column="order_id",
     )
     log_rows = (

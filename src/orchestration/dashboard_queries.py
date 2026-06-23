@@ -11,7 +11,7 @@ def build_dashboard_datasets(spark: SparkSession) -> dict:
         """
         SELECT
           date_trunc('month', d.full_date) AS order_month,
-          ROUND(SUM(f.line_total_value), 2) AS monthly_revenue
+          ROUND(SUM(f.total_amount), 2) AS monthly_revenue
         FROM globalmart.gold.fact_sales f
         INNER JOIN globalmart.gold.dim_date d ON f.date_key = d.date_key
         GROUP BY date_trunc('month', d.full_date)
@@ -23,7 +23,7 @@ def build_dashboard_datasets(spark: SparkSession) -> dict:
         """
         SELECT
           dc.customer_state,
-          ROUND(SUM(f.line_total_value), 2) AS revenue,
+          ROUND(SUM(f.total_amount), 2) AS revenue,
           COUNT(DISTINCT f.order_id) AS order_count
         FROM globalmart.gold.fact_sales f
         INNER JOIN globalmart.gold.dim_customer dc
@@ -50,7 +50,7 @@ def build_dashboard_datasets(spark: SparkSession) -> dict:
         """
         SELECT
           dp.category_name_en AS category,
-          ROUND(SUM(f.line_total_value), 2) AS revenue
+          ROUND(SUM(f.total_amount), 2) AS revenue
         FROM globalmart.gold.fact_sales f
         INNER JOIN globalmart.gold.dim_product dp ON f.product_sk = dp.product_sk
         GROUP BY dp.category_name_en
@@ -64,7 +64,7 @@ def build_dashboard_datasets(spark: SparkSession) -> dict:
         SELECT
           ds.seller_id,
           ds.seller_state,
-          ROUND(SUM(f.line_total_value), 2) AS revenue,
+          ROUND(SUM(f.total_amount), 2) AS revenue,
           COUNT(DISTINCT f.order_id) AS order_count
         FROM globalmart.gold.fact_sales f
         INNER JOIN globalmart.gold.dim_seller ds ON f.seller_sk = ds.seller_sk
