@@ -14,9 +14,23 @@ class PipelineParams:
 
 
 def bind_pipeline_widgets(dbutils) -> None:
-    dbutils.widgets.text("pipeline_run_id", str(uuid.uuid4()), "Pipeline run ID")
-    dbutils.widgets.dropdown("dry_run", "false", ["true", "false"], "Dry run (skip writes)")
-    dbutils.widgets.text(
+    """Create widgets for manual runs; do not overwrite values passed by a Workflow job."""
+
+    def _ensure_text(name: str, default: str, label: str = "") -> None:
+        try:
+            dbutils.widgets.get(name)
+        except Exception:
+            dbutils.widgets.text(name, default, label)
+
+    def _ensure_dropdown(name: str, default: str, choices: list[str], label: str = "") -> None:
+        try:
+            dbutils.widgets.get(name)
+        except Exception:
+            dbutils.widgets.dropdown(name, default, choices, label)
+
+    _ensure_text("pipeline_run_id", str(uuid.uuid4()), "Pipeline run ID")
+    _ensure_dropdown("dry_run", "false", ["true", "false"], "Dry run (skip writes)")
+    _ensure_text(
         "simulate_failure",
         "",
         "Simulate failure (task name: bronze_ingestion, quality_checks, ...)",
