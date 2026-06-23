@@ -30,6 +30,12 @@ dbt/target/
 dbt/logs/
 dbt/dbt_packages/
 
+# Airflow local state
+airflow/airflow.db
+airflow/logs/
+airflow/data/pipeline_state.db
+.venv-airflow/
+
 # Personal — local only
 Project.md
 PROGRESS.md

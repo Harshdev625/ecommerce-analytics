@@ -1,0 +1,99 @@
+{
+  "name": "globalmart_daily_pipeline",
+  "description": "GlobalMart medallion pipeline — bronze through visualization",
+  "max_concurrent_runs": 1,
+  "format": "MULTI_TASK",
+  "parameters": [
+    { "name": "pipeline_run_id", "default": "" },
+    { "name": "dry_run", "default": "false" },
+    { "name": "simulate_failure", "default": "" }
+  ],
+  "tasks": [
+    {
+      "task_key": "bronze_ingestion",
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/01_bronze_ingestion",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    },
+    {
+      "task_key": "quality_checks",
+      "depends_on": [{ "task_key": "bronze_ingestion" }],
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/02_quality_checks",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    },
+    {
+      "task_key": "silver_transforms",
+      "depends_on": [{ "task_key": "quality_checks" }],
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/03_silver_transforms",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    },
+    {
+      "task_key": "reconciliation",
+      "depends_on": [{ "task_key": "silver_transforms" }],
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/04_reconciliation",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    },
+    {
+      "task_key": "gold_aggregations",
+      "depends_on": [{ "task_key": "silver_transforms" }],
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/05_gold_aggregations",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    },
+    {
+      "task_key": "dimensional_refresh",
+      "depends_on": [
+        { "task_key": "reconciliation" },
+        { "task_key": "gold_aggregations" }
+      ],
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/06_dimensional_refresh",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    },
+    {
+      "task_key": "visualization",
+      "depends_on": [{ "task_key": "dimensional_refresh" }],
+      "notebook_task": {
+        "notebook_path": "<REPO_PATH>/notebooks/10_orchestration/07_visualization",
+        "base_parameters": {
+          "pipeline_run_id": "{{job.parameters.pipeline_run_id}}",
+          "dry_run": "{{job.parameters.dry_run}}",
+          "simulate_failure": "{{job.parameters.simulate_failure}}"
+        }
+      }
+    }
+  ]
+}

@@ -697,8 +697,40 @@ Views created successfully on Databricks. **Verified.**
 
 ---
 
+## Orchestration
+
+**Folder:** `10_orchestration/` · **Code:** `src/orchestration/` · **Workflow:** `config/workflows/globalmart_pipeline.job.json`
+
+| Component | Status |
+|-----------|--------|
+| 7 parameterized pipeline notebooks | **Ready** — run via Databricks Workflow |
+| Workflow JSON (bronze → visualization) | **Ready** — replace `<REPO_PATH>` |
+| Airflow DAGs (`airflow/dags/`) | **Ready** — local setup in `airflow/README.md` |
+| Unit tests (`tests/test_silver_transformations.py`) | **Ready** — run locally with PySpark |
+| Lakeview SQL (`dashboard/lakeview_queries.sql`) | **Ready** — publish dashboard in UI |
+
+### Pipeline tasks
+
+| Task key | Notebook | Depends on |
+|----------|----------|------------|
+| `bronze_ingestion` | `01_bronze_ingestion` | — |
+| `quality_checks` | `02_quality_checks` | bronze |
+| `silver_transforms` | `03_silver_transforms` | quality |
+| `reconciliation` | `04_reconciliation` | silver |
+| `gold_aggregations` | `05_gold_aggregations` | silver (parallel) |
+| `dimensional_refresh` | `06_dimensional_refresh` | reconciliation + gold |
+| `visualization` | `07_visualization` | dimensional |
+
+**Widgets:** `pipeline_run_id`, `dry_run`, `simulate_failure` (task key to demo downstream skips).
+
+**Reports:** `/Volumes/globalmart/metadata/run_reports/pipeline_*.json`
+
+*Pending: successful workflow run + failure demo + Airflow trigger + `dbt test` sign-off documented here.*
+
+---
+
 ## Not yet built
 
 | Area | Planned work |
 |------|----------------|
-| **Orchestration** | Workflows, Airflow, unit tests, dashboard |
+| *(none — pipeline code complete)* | Final reflection essay (assignment) |

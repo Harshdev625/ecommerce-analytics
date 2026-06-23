@@ -2,14 +2,14 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Phases `01`–`09` largely complete · `06_gold_observability` ready to run · orchestration next  
+**Pipeline status:** Phases `01`–`09` complete · Phase `10_orchestration` ready to run on Databricks  
 **Run results:** [`Result.md`](Result.md)
 
 ---
 
 ## Repository structure
 
-Notebook folders **`01_*` … `09_*`** — run in numeric order:
+Notebook folders **`01_*` … `10_*`** — run in numeric order:
 
 ```
 ecommerce-analytics/
@@ -25,12 +25,18 @@ ecommerce-analytics/
 │   ├── 06_gold_observability/    # materialized views, extended gold, streaming, secure views
 │   ├── 07_dimensional/           # star schema
 │   ├── 08_delta_ops/             # Delta Lake optimization
-│   └── 09_dbt/
+│   ├── 09_dbt/
+│   └── 10_orchestration/         # workflow tasks + runbook
+├── config/workflows/             # Databricks job JSON
+├── airflow/                      # local Airflow DAGs
+├── dashboard/                    # Lakeview SQL
+├── tests/                        # silver unit tests
 ├── dbt/
 └── src/
     ├── ingestion/, quality/, transformations/
     ├── spark_performance/, joins/, gold/
     ├── gold_observability/, dimensional/, delta_ops/
+    └── orchestration/
 ```
 
 ---
@@ -140,12 +146,29 @@ Upload the 8 Olist CSVs to `/Volumes/globalmart/bronze/raw_landing/` after runni
 
 Requires `gold.dim_*` tables from `07_dimensional/` for the incremental fact model.
 
+### `10_orchestration/` — pipeline orchestration *(run on Databricks)*
+
+| Notebook | Workflow task |
+|----------|----------------|
+| `01_bronze_ingestion.ipynb` | Idempotent bronze load |
+| `02_quality_checks.ipynb` | DQ on `bronze.orders` |
+| `03_silver_transforms.ipynb` | Silver entities + DLQ gate |
+| `04_reconciliation.ipynb` | Bronze vs silver reconciliation |
+| `05_gold_aggregations.ipynb` | Daily summary + seller performance |
+| `06_dimensional_refresh.ipynb` | Star schema rebuild |
+| `07_visualization.ipynb` | Dashboard datasets + star query |
+| `08_workflow_runbook.ipynb` | Job setup + failure demo |
+
+**Also:** `config/workflows/globalmart_pipeline.job.json` · `airflow/` · `tests/` · `dashboard/lakeview_queries.sql`
+
+**Code:** `src/orchestration/`
+
 ---
 
 ## Architecture
 
 ```text
-Bronze → Silver → Gold → Observability → Dimensional → Delta ops → dbt → Orchestration (planned)
+Bronze → Silver → Gold → Observability → Dimensional → Delta ops → dbt → Orchestration
 ```
 
 JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
@@ -156,6 +179,8 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Work |
 |------|------|
-| Gold observability | Run `06_gold_observability/` notebooks on Databricks |
+| Orchestration | Create Databricks Workflow from `config/workflows/`, run `10_orchestration/` notebooks |
+| Airflow | Local `airflow standalone` + trigger job (see `airflow/README.md`) |
+| Unit tests | `pip install -r tests/requirements.txt` then `python -m unittest tests.test_silver_transformations` |
+| Dashboard | Publish Lakeview dashboard from `dashboard/lakeview_queries.sql` |
 | dbt | Confirm `dbt test` passes; document in `Result.md` |
-| Orchestration | Databricks Workflow, Airflow, tests, dashboard |
