@@ -710,8 +710,9 @@ Views created successfully on Databricks. **Verified.**
 | `04_reconciliation` | **Verified** |
 | `05_gold_aggregations` | **Verified** |
 | `06_dimensional_refresh` | **Verified** |
-| `07_visualization` | Run after `total_amount` SQL fix |
-| Databricks Workflow job | Pending |
+| `07_visualization` | **Verified** |
+| `00_run_full_pipeline` | **Verified** (end-to-end, Free Edition) |
+| Databricks Workflow job | Skipped (Free Edition — `00` used instead) |
 | Airflow / unit tests / Lakeview | Pending |
 
 ### Bronze ingestion
@@ -783,19 +784,27 @@ Historical orders vs recent `_ingested_at` classify as `very_late`; downstream `
 
 ### Visualization
 
-**Report:** `pipeline_visualization.json` · Uses `fact_sales.total_amount` for dashboard datasets. Re-run `07_visualization.ipynb` after Pull if not yet successful.
+**Report:** `pipeline_visualization.json` · Dashboard datasets from `fact_sales.total_amount`. **Verified.**
 
-### Workflow job (pending)
+### End-to-end pipeline (`00_run_full_pipeline`)
 
-| Task key | Depends on |
-|----------|------------|
-| `bronze_ingestion` | — |
-| `quality_checks` | bronze |
-| `silver_transforms` | quality |
-| `reconciliation` | silver |
-| `gold_aggregations` | silver (parallel) |
-| `dimensional_refresh` | reconciliation + gold |
-| `visualization` | dimensional |
+**Run ID:** `f704199a-282f-4fc6-ace5-6b1ae9c9d55d` · **Databricks Free Edition** (sequential `dbutils.notebook.run`, no Workflow job)
+
+| Task | Status |
+|------|--------|
+| `bronze_ingestion` | **SUCCESS** |
+| `quality_checks` | **SUCCESS** |
+| `silver_transforms` | **SUCCESS** |
+| `reconciliation` | **SUCCESS** |
+| `gold_aggregations` | **SUCCESS** |
+| `dimensional_refresh` | **SUCCESS** |
+| `visualization` | **SUCCESS** |
+
+All seven tasks green in one run. **Verified.**
+
+### Workflow job (optional)
+
+On Free Edition, `00_run_full_pipeline.ipynb` replaces a multi-task Workflow job. Optional failure demo: re-run `00` with `simulate_failure=silver_transforms`.
 
 **Widgets:** `pipeline_run_id`, `dry_run`, `simulate_failure`
 

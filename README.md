@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Phases `01`–`09` complete · Phase `10_orchestration` notebooks verified on Databricks (workflow + dashboard pending)  
+**Pipeline status:** Phases `01`–`10` orchestration verified on Databricks · Lakeview dashboard + `dbt test` pending  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -179,10 +179,8 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Work |
 |------|------|
-| Visualization | Re-run `10_orchestration/07_visualization` after Pull (if not done) |
-| Workflow job | Create + run full job from `config/workflows/globalmart_pipeline.job.json` |
-| Failure demo | Job parameter `simulate_failure=silver_transforms` |
 | Lakeview | Publish dashboard from `dashboard/lakeview_queries.sql` |
 | dbt | Confirm `dbt test` in `09_dbt/01` |
-| Local (optional) | Unit tests (`tests/`), Airflow (`airflow/README.md`) |
-| Assignment | Final reflection essay (300–500 words) |
+| Optional | Failure demo on `00` (`simulate_failure=silver_transforms`) |
+| Optional | Local unit tests / Airflow (`airflow/README.md`) |
+| Assignment | Final reflection essay |
