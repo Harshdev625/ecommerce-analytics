@@ -577,27 +577,49 @@ Revenue matches on both layouts; liquid clustering ~**2.4×** faster on this run
 
 ### Customer snapshot
 
-**Table:** `globalmart.dbt_dev.snap_customers` · **Rows:** **99,441**
+**Table:** `globalmart.dbt_dev.snap_customers`
 
-dbt snapshot strategy: `timestamp` on `processed_at`, `unique_key = customer_id`. Compare to SCD2 in `gold.dim_customer`. **Verified.**
+| Metric | Value |
+|--------|-------|
+| Rows after latest `dbt snapshot` | **198,882** |
+| Strategy | `timestamp` on `processed_at`, `unique_key = customer_id` |
+
+Snapshot history rows accumulate on re-run (current source: **99,441** customers). Compare to SCD2 in `gold.dim_customer`. **Verified.**
+
+### Model run (`dbt run`)
+
+**Target:** `dev` · **dbt:** 1.11.11 · **adapter:** databricks 1.12.1
+
+| Result | Value |
+|--------|-------|
+| Models built | **9/9 PASS** (6 views, 2 tables, 1 incremental) |
+| Duration | **38.56s** |
+
+Objects: staging views (`stg_*`), `int_delivered_order_items`, marts (`mart_daily_sales`, `mart_customer_rfm`), `fact_sales_incremental`.
+
+### Data tests (`dbt test`)
+
+**Target:** `dev`
+
+| Result | Value |
+|--------|-------|
+| Tests | **26/26 PASS** |
+| Warnings / errors | **0** |
+| Duration | **16.87s** |
+
+Coverage: `not_null`, `unique`, `accepted_values`, `relationships` (including `fact_sales_incremental.date_key` → `gold.dim_date`), and custom test `assert_delivered_orders_positive_revenue`. **Verified.**
 
 ### Staging, marts, tests
-
-Built by `dbt run` / `dbt test` in notebook:
 
 | Layer | Objects |
 |-------|---------|
 | Staging | `stg_orders`, `stg_order_items`, `stg_customers`, `stg_sellers`, `stg_products` |
 | Intermediate | `int_delivered_order_items` |
 | Marts | `mart_daily_sales`, `mart_customer_rfm` |
+| Incremental | `fact_sales_incremental` |
+| Snapshot | `snap_customers` |
 | Macro | `normalize_city` / `normalize_state` (customers + sellers) |
-| Tests | Schema tests + `assert_delivered_orders_positive_revenue` |
-
-Incremental fact + snapshot verified on Databricks. **Run `dbt test`** in `09_dbt/01` and paste output below when complete:
-
-```text
-dbt test — pending sign-off
-```
+| Tests | **26** schema + singular tests — all passing |
 
 ---
 
@@ -717,8 +739,8 @@ Views created successfully on Databricks. **Verified.**
 | `07_visualization` | **Verified** |
 | `00_run_full_pipeline` | **Verified** (end-to-end, Free Edition) |
 | Databricks Workflow job | Skipped (Free Edition — `00` used instead) |
-| Lakeview dashboard UI | **Pending** — see [`dashboard/README.md`](dashboard/README.md) |
-| `dbt test` full suite | **Pending** — run `09_dbt/01` test cell |
+| Lakeview dashboard UI | **Verified** — [GlobalMart Sales Analytics](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188) |
+| `dbt test` full suite | **Verified** — **26/26 PASS** |
 | Airflow / unit tests | Optional (local PC) |
 
 ### Bronze ingestion
@@ -792,6 +814,20 @@ Historical orders vs recent `_ingested_at` classify as `very_late`; downstream `
 
 **Report:** `pipeline_visualization.json` · Dashboard datasets from `fact_sales.total_amount`. **Verified.**
 
+### Lakeview dashboard
+
+**Link:** [GlobalMart Sales Analytics](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188)
+
+| Visualization | Source |
+|---------------|--------|
+| Monthly revenue trend | `gold.fact_sales`, `gold.dim_date` |
+| Revenue by state (top 10) | `gold.fact_sales`, `gold.dim_customer` |
+| Late delivery rate by month | `gold.fact_sales`, `gold.dim_date` |
+| Revenue by category (top 10) | `gold.fact_sales`, `gold.dim_product` |
+| Top sellers by revenue | `gold.fact_sales`, `gold.dim_seller` |
+
+SQL: `dashboard/lakeview_queries.sql`. **Verified.**
+
 ### End-to-end pipeline (`00_run_full_pipeline`)
 
 **Run ID:** `f704199a-282f-4fc6-ace5-6b1ae9c9d55d` · **Databricks Free Edition** (sequential `dbutils.notebook.run`, no Workflow job)
@@ -824,10 +860,10 @@ On Free Edition, `00_run_full_pipeline.ipynb` replaces a multi-task Workflow job
 | 2 | `06_gold_observability` (materialized views, streaming, secure views) | **Done** |
 | 3 | `07_dimensional` star schema — `fact_sales` **110,197** rows | **Done** |
 | 4 | `08_delta_ops` (OPTIMIZE, VACUUM, time travel, liquid clustering) | **Done** |
-| 5 | `09_dbt` debug, freshness, incremental fact, snapshot | **Done** |
+| 5 | `09_dbt` — run, test, incremental fact, snapshot | **Done** |
 | 6 | `00_run_full_pipeline` end-to-end (`f704199a-…`, 7/7 SUCCESS) | **Done** |
-| 7 | Lakeview dashboard — 5 charts from `dashboard/lakeview_queries.sql` | **Pending** |
-| 8 | `dbt test` — full suite in `09_dbt/01` | **Pending** |
+| 7 | Lakeview dashboard — 5 charts | **Done** — [published](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188) |
+| 8 | `dbt test` — full suite in `09_dbt/01` | **Done** — **26/26 PASS** |
 | 9 | Final reflection essay (300–500 words) | **Pending** (assignment) |
 | — | Airflow, unit tests, Workflow job, failure demo | Optional |
 
