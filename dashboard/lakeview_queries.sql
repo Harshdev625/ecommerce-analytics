@@ -1,4 +1,4 @@
--- Lakeview dashboard queries (Task 10.5)
+-- Lakeview dashboard queries (10_orchestration / visualization)
 -- fact_sales revenue column is total_amount (not line_total_value).
 
 -- 1. Revenue trend — monthly revenue over time

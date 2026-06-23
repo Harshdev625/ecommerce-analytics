@@ -1,4 +1,4 @@
-# Airflow — local orchestration (Milestone 10)
+# Airflow — local orchestration (`10_orchestration/`)
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ Open http://localhost:8080 — trigger `globalmart_databricks_workflow` or `glob
 | `globalmart_databricks_workflow` | Trigger + poll Databricks job via REST API |
 | `globalmart_daily_transactions` | FileSensor, branching, idempotent load, backfill, failure recovery demo |
 
-## Production patterns (Task 10.3)
+## Production patterns (orchestration phase)
 
 1. **Idempotency** — trigger `globalmart_daily_transactions` twice for the same `logical_date`; target row count unchanged.
 2. **Sensors & branching** — empty or invalid file routes to `handle_invalid_file`, skips load.
