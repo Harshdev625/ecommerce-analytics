@@ -1,0 +1,6 @@
+-r tests/requirements.txt
+pytest>=8.0
+
+# Airflow UI — use Podman (Python 3.13 not supported by apache-airflow 2.x locally)
+# podman compose -f podman/compose.yaml up
+requests>=2.31.0

@@ -1,0 +1,16 @@
+services:
+  airflow:
+    image: docker.io/apache/airflow:2.10.4-python3.11
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      _AIRFLOW_DB_MIGRATE: "true"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: admin
+      _AIRFLOW_WWW_USER_PASSWORD: admin
+    volumes:
+      - ../airflow/dags:/opt/airflow/dags
+      - ../airflow/data:/opt/airflow/data
+    ports:
+      - "8080:8080"
+    command: standalone

@@ -1,6 +1,23 @@
 # GlobalMart — E-Commerce Analytics
 
-End-to-end medallion data pipeline on Databricks for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset. Pipeline outputs and verification details are documented in [`Result.md`](Result.md).
+End-to-end medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
+
+Verified metrics, run reports, and test results: [`Result.md`](Result.md)
+
+---
+
+## Highlights
+
+| Area | Result |
+|------|--------|
+| Star schema | `gold.fact_sales` — **110,197** rows · **R$15.4M** revenue |
+| Reconciliation | **all_passed: true** (99,441 order keys) |
+| dbt | **9/9** models · **26/26** tests |
+| End-to-end pipeline | **7/7** tasks SUCCESS |
+| Dashboard | [GlobalMart Sales Analytics (Lakeview)](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188) |
+| Local verification | **6/6** unit tests · Airflow pattern demos — [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md) |
+
+---
 
 ## Architecture
 
@@ -8,21 +25,88 @@ End-to-end medallion data pipeline on Databricks for the [Olist Brazilian E-Comm
 Bronze → Silver → Gold → Observability → Dimensional → Delta ops → dbt → Orchestration
 ```
 
-JSON run summaries are stored at `/Volumes/globalmart/metadata/run_reports/`.
+**Catalog:** `globalmart` · **Schemas:** `bronze`, `silver`, `gold`, `metadata`  
+**Run reports:** `/Volumes/globalmart/metadata/run_reports/` (JSON per notebook/task)
+
+---
+
+## Pipeline orchestration
+
+Production flow is implemented in `notebooks/10_orchestration/` with reusable code in `src/orchestration/`.
+
+```text
+00_run_full_pipeline
+  ├── 01_bronze_ingestion      → idempotent CSV load
+  ├── 02_quality_checks        → DQ on bronze.orders
+  ├── 03_silver_transforms     → silver entities + DLQ gate
+  ├── 04_reconciliation        → bronze vs silver (3-level)
+  ├── 05_gold_aggregations     → daily summary + seller performance
+  ├── 06_dimensional_refresh   → star schema rebuild
+  └── 07_visualization         → dashboard datasets
+```
+
+**Run on Databricks:** open `00_run_full_pipeline.ipynb` (chains all seven tasks via `dbutils.notebook.run`).
+
+**Widgets:** `pipeline_run_id`, `dry_run`, `simulate_failure` — set `simulate_failure=silver_transforms` to demo downstream skip behavior.
+
+**Workflow job (optional):** `config/workflows/globalmart_pipeline.job.json`  
+**Airflow (local):** `airflow/dags/` · pattern demo: `scripts/demo_airflow_patterns.py`
+
+---
 
 ## Dashboard
 
 [GlobalMart Sales Analytics (Databricks Lakeview)](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188)
 
-The dashboard covers revenue trends, geographic distribution, delivery performance, category mix, and seller rankings over the gold star schema. Query definitions and setup instructions are in [`dashboard/`](dashboard/).
+Five charts over the gold star schema: revenue trend, revenue by state, delivery performance, top categories, top sellers.
 
-## Getting started
+SQL and setup: [`dashboard/lakeview_queries.sql`](dashboard/lakeview_queries.sql) · [`dashboard/README.md`](dashboard/README.md)
 
-1. Clone this repository into Databricks Repos.
-2. Execute `config/catalog_setup.sql` to provision the `globalmart` catalog.
+---
+
+## Databricks setup
+
+1. Clone this repository into **Databricks Repos**.
+2. Run [`config/catalog_setup.sql`](config/catalog_setup.sql) to create the `globalmart` catalog.
 3. Upload the eight Olist CSV files to `/Volumes/globalmart/bronze/raw_landing/`.
-4. Run notebooks in `01_bronze/` through `10_orchestration/` in order, or execute `00_run_full_pipeline.ipynb` for a full pipeline run.
-5. Develop locally, push to the remote repository, and pull changes in Databricks Repos.
+4. Run notebooks **`01_bronze/` → `10_orchestration/`** in order, or **`00_run_full_pipeline.ipynb`** for end-to-end.
+5. Configure `dbt/profiles.yml` locally (gitignored) before running `09_dbt/01_dbt_setup_and_run.ipynb`.
+6. Develop on PC → `git push` → Databricks **Pull** (avoid Commit & Push from the Databricks UI).
+
+---
+
+## Local development
+
+PC-only tests and demos live under `local/` (gitignored). Databricks tests remain in `tests/`.
+
+```powershell
+cd E:\Projects\ecommerce-analytics
+.\scripts\setup_local.ps1
+.\scripts\run_local_verification.ps1
+```
+
+Optional Airflow UI (Podman):
+
+```powershell
+podman compose -f podman/compose.yaml up
+```
+
+Full guide: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md)
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| [`Result.md`](Result.md) | Verified run metrics and deliverable sign-off |
+| [`docs/LINEAGE.md`](docs/LINEAGE.md) | Gold-layer upstream dependencies |
+| [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md) | venv, tests, Airflow patterns, Podman |
+| [`dashboard/README.md`](dashboard/README.md) | Lakeview dashboard |
+| [`dbt/README.md`](dbt/README.md) | dbt project commands |
+| [`airflow/README.md`](airflow/README.md) | Airflow DAG setup |
+
+---
 
 ## Repository layout
 
@@ -30,25 +114,21 @@ The dashboard covers revenue trends, geographic distribution, delivery performan
 ecommerce-analytics/
 ├── README.md
 ├── Result.md
-├── config/catalog_setup.sql
-├── notebooks/
-│   ├── 01_bronze/
-│   ├── 02_spark_performance/
-│   ├── 03_silver_quality/
-│   ├── 04_joins_cdc/
-│   ├── 05_gold_analytics/
-│   ├── 06_gold_observability/
-│   ├── 07_dimensional/
-│   ├── 08_delta_ops/
-│   ├── 09_dbt/
-│   └── 10_orchestration/
-├── config/workflows/
-├── airflow/
-├── dashboard/
-├── tests/
-├── dbt/
-└── src/
+├── config/
+│   ├── catalog_setup.sql
+│   └── workflows/globalmart_pipeline.job.json
+├── notebooks/          # 01_bronze … 10_orchestration
+├── src/                # Python modules per layer
+├── dbt/                # Staging, marts, incremental fact, snapshot
+├── dashboard/          # Lakeview SQL
+├── airflow/dags/       # Local orchestration DAGs
+├── tests/              # Databricks unit tests (full DQ rules)
+├── scripts/            # Local setup and verification
+├── docs/               # Lineage and local setup guides
+└── podman/             # Optional Airflow compose
 ```
+
+---
 
 ## Notebooks
 
@@ -106,7 +186,7 @@ ecommerce-analytics/
 | `03_streaming_orders.ipynb` | Streaming orders table |
 | `04_dynamic_views.ipynb` | Column masking and row-level security |
 
-Supporting modules: `src/gold_observability/`
+Code: `src/gold_observability/`
 
 ### `07_dimensional/` — dimensional model
 
@@ -135,9 +215,9 @@ Supporting modules: `src/gold_observability/`
 | Item | Purpose |
 |------|---------|
 | `dbt/` | Staging models, marts, incremental fact, snapshots, and tests |
-| `01_dbt_setup_and_run.ipynb` | dbt installation, execution, and testing |
+| `01_dbt_setup_and_run.ipynb` | dbt install, run, test, snapshot, docs generate |
 
-The incremental fact model requires dimensional tables from `07_dimensional/`.
+Requires `gold.dim_*` tables from `07_dimensional/`.
 
 ### `10_orchestration/` — pipeline orchestration
 
@@ -151,8 +231,6 @@ The incremental fact model requires dimensional tables from `07_dimensional/`.
 | `05_gold_aggregations.ipynb` | Gold aggregation refresh |
 | `06_dimensional_refresh.ipynb` | Dimensional model refresh |
 | `07_visualization.ipynb` | Dashboard dataset preparation |
-| `08_workflow_runbook.ipynb` | Workflow deployment notes |
+| `08_workflow_runbook.ipynb` | Workflow and Free Edition notes |
 
-Additional assets: `config/workflows/globalmart_pipeline.job.json`, `airflow/`, `tests/`, and [`dashboard/`](dashboard/).
-
-Supporting modules: `src/orchestration/`
+Code: `src/orchestration/`

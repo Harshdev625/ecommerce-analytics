@@ -34,8 +34,14 @@ dbt/dbt_packages/
 airflow/airflow.db
 airflow/logs/
 airflow/data/pipeline_state.db
+airflow/data/local_pattern_demo.json
 .venv-airflow/
 
 # Personal — local only
 Project.md
 PROGRESS.md
+REFLECTION.md
+local/
+
+# Local venv
+.venv/

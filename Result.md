@@ -621,6 +621,19 @@ Coverage: `not_null`, `unique`, `accepted_values`, `relationships` (including `f
 | Macro | `normalize_city` / `normalize_state` (customers + sellers) |
 | Tests | **26** schema + singular tests — all passing |
 
+### dbt documentation (`dbt docs generate`)
+
+Run the last cell in `09_dbt/01_dbt_setup_and_run.ipynb` after `dbt run` / `dbt test`. Generates `dbt/target/index.html` with the model lineage graph (sources → staging → marts → incremental fact / snapshot). See [`docs/LINEAGE.md`](docs/LINEAGE.md).
+
+### Snapshot vs manual SCD Type 2
+
+| Approach | Table | Mechanism | Rows (latest run) |
+|----------|-------|-----------|-------------------|
+| Manual SCD2 | `gold.dim_customer` | MERGE closes current row, inserts new version | **99,441** current (+6 demo versions) |
+| dbt snapshot | `dbt_dev.snap_customers` | `dbt_valid_from` / `dbt_valid_to` on `processed_at` | **198,882** (history accumulates on re-run) |
+
+Both track customer attribute changes over time; manual SCD2 feeds the star schema, while the dbt snapshot demonstrates declarative history in the transformation layer.
+
 ---
 
 ## Gold observability
@@ -725,8 +738,7 @@ Views created successfully on Databricks. **Verified.**
 
 ## Orchestration
 
-**Folder:** `10_orchestration/` · **Code:** `src/orchestration/` · **Workflow:** `config/workflows/globalmart_pipeline.job.json`  
-**Workspace path:** `/Workspace/Users/devh9933@gmail.com/ecommerce-analytics`
+**Folder:** `10_orchestration/` · **Code:** `src/orchestration/` · **Workflow:** `config/workflows/globalmart_pipeline.job.json`
 
 | Notebook / task | Status |
 |-----------------|--------|
@@ -741,7 +753,8 @@ Views created successfully on Databricks. **Verified.**
 | Databricks Workflow job | Skipped (Free Edition — `00` used instead) |
 | Lakeview dashboard UI | **Verified** — [GlobalMart Sales Analytics](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188) |
 | `dbt test` full suite | **Verified** — **26/26 PASS** |
-| Airflow / unit tests | Optional (local PC) |
+| Airflow production patterns | **Verified locally** — `scripts/demo_airflow_patterns.py` |
+| Unit tests | **Verified locally** — **6/6 PASS** (`pytest local/tests/`) |
 
 ### Bronze ingestion
 
@@ -846,9 +859,44 @@ All seven tasks green in one run. **Verified.**
 
 ### Workflow job (optional)
 
-On Free Edition, `00_run_full_pipeline.ipynb` replaces a multi-task Workflow job. Optional failure demo: re-run `00` with `simulate_failure=silver_transforms`.
+On Free Edition, `00_run_full_pipeline.ipynb` replaces a multi-task Workflow job.
 
 **Widgets:** `pipeline_run_id`, `dry_run`, `simulate_failure`
+
+### Failure demo — expected behavior (intentional test)
+
+This is **not** a real pipeline failure. It documents what **should happen** when you deliberately set widget **`simulate_failure`** = `silver_transforms` on `00_run_full_pipeline` (assignment Task 10.1).
+
+| Task | Expected status when testing failure |
+|------|--------------------------------------|
+| `bronze_ingestion` | SUCCESS |
+| `quality_checks` | SUCCESS |
+| `silver_transforms` | **FAILED** on purpose (`simulated_failure`) |
+| `reconciliation` | **Skipped** — pipeline stops; downstream not executed |
+| `gold_aggregations` | **Skipped** |
+| `dimensional_refresh` | **Skipped** |
+| `visualization` | **Skipped** |
+
+That is correct orchestration behavior: one broken task must not run later steps on bad data. Re-run with empty `simulate_failure` → all **7/7 SUCCESS** (see table above).
+
+Report: `pipeline_silver_transforms.json` with `"error": "simulated_failure"`. Local logic verified in `local/tests/` (gitignored).
+
+### Lineage documentation
+
+Gold table upstream dependencies documented in [`docs/LINEAGE.md`](docs/LINEAGE.md) (Catalog Explorer lineage tab matches). Covers `fact_sales`, `daily_sales_summary`, and `dim_customer`.
+
+### Local orchestration (Airflow patterns)
+
+**Script:** `scripts/demo_airflow_patterns.py` · **Output:** `airflow/data/local_pattern_demo.json`
+
+| Pattern | Result |
+|---------|--------|
+| Idempotency | Second load for 2024-01-05 → **14** rows, `table_row_count` unchanged |
+| Sensors & branching | Valid file → `load_daily_file`; missing file → `handle_invalid_file` |
+| Backfill | **7** days processed (2024-01-01 … 2024-01-07), **77** total rows loaded |
+| Failure & recovery | `FORCE_LOAD_FAILURE=true` → load fails; recovery load succeeds |
+
+Setup: [`docs/LOCAL_SETUP.md`](docs/LOCAL_SETUP.md)
 
 ---
 
@@ -864,8 +912,8 @@ On Free Edition, `00_run_full_pipeline.ipynb` replaces a multi-task Workflow job
 | 6 | `00_run_full_pipeline` end-to-end (`f704199a-…`, 7/7 SUCCESS) | **Done** |
 | 7 | Lakeview dashboard — 5 charts | **Done** — [published](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188) |
 | 8 | `dbt test` — full suite in `09_dbt/01` | **Done** — **26/26 PASS** |
-| 9 | Final reflection essay (300–500 words) | **Pending** (assignment) |
-| — | Airflow, unit tests, Workflow job, failure demo | Optional |
+| 9 | Failure demo + lineage + local tests | **Done** — **6/6** local · see Orchestration |
+| — | Airflow UI / Databricks Workflow job | Optional (Podman / paid workspace) |
 
 ### Key metrics (verified)
 

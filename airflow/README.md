@@ -53,6 +53,22 @@ Open http://localhost:8080 — trigger `globalmart_databricks_workflow` or `glob
 | `globalmart_databricks_workflow` | Trigger + poll Databricks job via REST API |
 | `globalmart_daily_transactions` | FileSensor, branching, idempotent load, backfill, failure recovery demo |
 
+## Local verification (no UI)
+
+```powershell
+python scripts/demo_airflow_patterns.py
+```
+
+Runs all four production patterns against SQLite. See [`docs/LOCAL_SETUP.md`](../docs/LOCAL_SETUP.md).
+
+## Airflow UI (Podman)
+
+```powershell
+podman compose -f podman/compose.yaml up
+```
+
+Open http://localhost:8080 (admin / admin). Python 3.13 cannot run Airflow 2.x in a local venv — use Podman or Python 3.12.
+
 ## Production patterns (orchestration phase)
 
 1. **Idempotency** — trigger `globalmart_daily_transactions` twice for the same `logical_date`; target row count unchanged.
