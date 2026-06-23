@@ -603,10 +603,76 @@ Incremental fact + snapshot verified on Databricks; confirm `dbt test` output fo
 
 | Notebook | Target / output | Status |
 |----------|-----------------|--------|
-| `01_materialized_views.ipynb` | `gold.v_seller_daily_revenue`, `gold.mv_seller_daily_revenue` | pending Databricks run |
-| `02_gold_aggregations.ipynb` | `gold.daily_sales_summary`, `gold.seller_performance_monthly` | pending |
-| `03_streaming_orders.ipynb` | `gold.orders_stream` vs `bronze.orders` | pending |
+| `01_materialized_views.ipynb` | `gold.v_seller_daily_revenue`, `gold.t_seller_daily_revenue_materialized` | **Verified** |
+| `02_gold_aggregations.ipynb` | `gold.daily_sales_summary`, `gold.seller_performance_monthly` | **Verified** |
+| `03_streaming_orders.ipynb` | `gold.orders_stream` vs `bronze.orders` base rows | **Verified** |
 | `04_dynamic_views.ipynb` | `gold.v_customers_masked`, `gold.v_fact_sales_by_state` | pending |
+
+### Materialized views (Serverless fallback)
+
+**Report:** `gold_materialized_views.json` · **Filter:** seller state **SP**
+
+| Object | Name |
+|--------|------|
+| Regular view | `globalmart.gold.v_seller_daily_revenue` |
+| Pre-computed cache | `globalmart.gold.t_seller_daily_revenue_materialized` |
+| Mode | **`delta_table_cache`** — native `CREATE MATERIALIZED VIEW` disabled on Serverless Free |
+
+**Query timing (SUM daily_revenue WHERE seller_state = 'SP'):**
+
+| Step | Time (ms) |
+|------|-----------|
+| Regular view | **3,507.24** |
+| Delta table query (after refresh) | **1,344.51** |
+| Delta table refresh (`CREATE OR REPLACE TABLE AS SELECT`) | **4,644.82** |
+
+Pre-computed Delta table reads ~**2.6× faster** than the regular view on this filter; refresh cost is paid upfront on each rebuild. **Verified** on Databricks Serverless.
+
+### Daily sales summary & seller performance
+
+**Report:** `gold_aggregations.json`
+
+#### Daily sales summary
+
+**Table:** `globalmart.gold.daily_sales_summary` · **Rows:** **612**
+
+| Check | Result |
+|-------|--------|
+| Rows validated | **612** |
+| Validation failures | **0** |
+| All rows valid | **true** |
+
+New vs returning customer logic passed row-level validation on every day. **Verified.**
+
+#### Seller performance (monthly)
+
+**Table:** `globalmart.gold.seller_performance_monthly` · **Rows:** **16,068**
+
+**Top 5 sellers — Jan 2018 (overall revenue rank):**
+
+| Rank | Seller state | Monthly revenue (R$) | Orders | Avg delivery (days) | Late rate |
+|------|--------------|------------------------|--------|---------------------|-----------|
+| 1 | SP | 22,898.56 | 195 | 12.16 | 5.5% |
+| 2 | SP | 22,305.09 | 158 | 8.01 | 4.3% |
+| 3 | SP | 21,574.08 | 229 | 8.36 | 2.4% |
+| 4 | SP | 21,237.03 | 72 | 11.14 | 2.8% |
+| 5 | SP | 20,040.26 | 89 | 15.89 | 15.9% |
+
+All top-5 sample rows are **São Paulo (SP)** with matching overall and in-state ranks. **Verified.**
+
+### Streaming orders table
+
+**Report:** `gold_orders_stream.json` · **Source:** `/Volumes/globalmart/bronze/raw_landing/olist_orders_dataset.csv`
+
+| Metric | Value |
+|--------|-------|
+| `globalmart.gold.orders_stream` rows | **99,441** |
+| `bronze.orders` total rows | **99,941** |
+| `bronze.orders` base rows (landing CSV) | **99,441** |
+| Schema-evolution delta | **500** (from `01_bronze/04_schema_evolution`) |
+| Stream vs base match | **✓** (99,441 = 99,441) |
+
+The stream load reads only the original Olist CSV columns (`order_id`, `customer_id`, `order_status`, `order_purchase_timestamp`) plus `_stream_ingested_at`. Total `bronze.orders` is higher because **500 evolved-schema demo rows** were appended earlier. **Verified.**
 
 ---
 
