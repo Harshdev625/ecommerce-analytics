@@ -606,7 +606,7 @@ Incremental fact + snapshot verified on Databricks; confirm `dbt test` output fo
 | `01_materialized_views.ipynb` | `gold.v_seller_daily_revenue`, `gold.t_seller_daily_revenue_materialized` | **Verified** |
 | `02_gold_aggregations.ipynb` | `gold.daily_sales_summary`, `gold.seller_performance_monthly` | **Verified** |
 | `03_streaming_orders.ipynb` | `gold.orders_stream` vs `bronze.orders` base rows | **Verified** |
-| `04_dynamic_views.ipynb` | `gold.v_customers_masked`, `gold.v_fact_sales_by_state` | pending |
+| `04_dynamic_views.ipynb` | `gold.v_customers_masked`, `gold.v_fact_sales_by_state` | **Verified** |
 
 ### Materialized views (Serverless fallback)
 
@@ -670,9 +670,30 @@ All top-5 sample rows are **São Paulo (SP)** with matching overall and in-state
 | `bronze.orders` total rows | **99,941** |
 | `bronze.orders` base rows (landing CSV) | **99,441** |
 | Schema-evolution delta | **500** (from `01_bronze/04_schema_evolution`) |
-| Stream vs base match | **✓** (99,441 = 99,441) |
+| Stream vs base match | **✓** (`counts_match`: **true**, 99,441 = 99,441) |
 
 The stream load reads only the original Olist CSV columns (`order_id`, `customer_id`, `order_status`, `order_purchase_timestamp`) plus `_stream_ingested_at`. Total `bronze.orders` is higher because **500 evolved-schema demo rows** were appended earlier. **Verified.**
+
+### Secure views (column masking & row-level filter)
+
+**Report:** `gold_secure_views.json`
+
+| Object | Name |
+|--------|------|
+| Masked customers view | `globalmart.gold.v_customers_masked` |
+| Row-filtered fact view | `globalmart.gold.v_fact_sales_by_state` |
+| Access control table | `globalmart.metadata.user_state_access` |
+
+**Column masking:** `customer_zip_code_prefix` masked as `***` + last 3 digits in `v_customers_masked` (sample read: **3** rows). **Verified.**
+
+**Row-level security:** `v_fact_sales_by_state` joins `fact_sales` → `dim_customer` (current) → `user_state_access`, filtered by `current_user()` email. Seed grants:
+
+| User | Allowed states |
+|------|----------------|
+| `analyst@example.com` | SP, RJ |
+| `manager@example.com` | MG |
+
+Views created successfully on Databricks. **Verified.**
 
 ---
 
