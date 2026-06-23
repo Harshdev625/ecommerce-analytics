@@ -1,23 +1,25 @@
-# Lakeview dashboard (`10_orchestration` visualization)
+# Lakeview Dashboard
 
-Publish **5 charts** on Databricks using SQL from `lakeview_queries.sql`.
+## Overview
 
-## Steps (Databricks Free Edition)
+[GlobalMart Sales Analytics](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188) is a Databricks Lakeview dashboard built on the `globalmart` gold layer.
 
-1. Open **SQL** or **Lakeview** in your workspace.
-2. For each query block in `lakeview_queries.sql`, run it against catalog `globalmart`.
-3. **Lakeview** → **Create** → **Dashboard**.
-4. Add one visualization per query:
+## Visualizations
 
-| # | Chart type (suggested) | Query section |
-|---|----------------------|---------------|
-| 1 | Line | Monthly revenue trend |
-| 2 | Bar / map | Revenue by customer state (top 10) |
-| 3 | Line | Late delivery rate by month |
-| 4 | Bar | Top categories by revenue |
-| 5 | Bar | Top sellers by revenue |
+| # | Visualization | SQL source |
+|---|---------------|------------|
+| 1 | Monthly revenue trend | Query 1 in `lakeview_queries.sql` |
+| 2 | Revenue by state (top 10) | Query 2 |
+| 3 | Late delivery rate by month | Query 3 |
+| 4 | Revenue by category (top 10) | Query 4 |
+| 5 | Top sellers by revenue | Query 5 |
 
-5. Title the dashboard **GlobalMart Business Overview**.
-6. **Publish** and copy the share link for your assignment.
+The orchestration notebook `07_visualization.ipynb` materializes equivalent aggregates to `pipeline_visualization.json`.
 
-Notebook `07_visualization.ipynb` already materializes the same aggregates to `pipeline_visualization.json` for verification.
+## Setup
+
+1. Open Lakeview in the Databricks workspace.
+2. Create a dataset for each query block in `lakeview_queries.sql` against catalog `globalmart`.
+3. Configure visualizations and publish the dashboard.
+
+Recommended chart types: line charts for trends, horizontal bar charts for rankings, and tables for seller metrics.

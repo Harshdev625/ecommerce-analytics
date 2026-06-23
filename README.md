@@ -1,15 +1,30 @@
 # GlobalMart — E-Commerce Analytics
 
-Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
+End-to-end medallion data pipeline on Databricks for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset. Pipeline outputs and verification details are documented in [`Result.md`](Result.md).
 
-**Pipeline status:** Phases `01`–`10` verified on Databricks Free Edition · **2 items left:** Lakeview dashboard + `dbt test`  
-**Run results:** [`Result.md`](Result.md) · **Dashboard guide:** [`dashboard/README.md`](dashboard/README.md)
+## Architecture
 
----
+```text
+Bronze → Silver → Gold → Observability → Dimensional → Delta ops → dbt → Orchestration
+```
 
-## Repository structure
+JSON run summaries are stored at `/Volumes/globalmart/metadata/run_reports/`.
 
-Notebook folders **`01_*` … `10_*`** — run in numeric order:
+## Dashboard
+
+[GlobalMart Sales Analytics (Databricks Lakeview)](https://dbc-a54a680a-a023.cloud.databricks.com/dashboardsv3/01f16f20d20b18a78431d3f7d22e6ccc/published?o=7474660156362188)
+
+The dashboard covers revenue trends, geographic distribution, delivery performance, category mix, and seller rankings over the gold star schema. Query definitions and setup instructions are in [`dashboard/`](dashboard/).
+
+## Getting started
+
+1. Clone this repository into Databricks Repos.
+2. Execute `config/catalog_setup.sql` to provision the `globalmart` catalog.
+3. Upload the eight Olist CSV files to `/Volumes/globalmart/bronze/raw_landing/`.
+4. Run notebooks in `01_bronze/` through `10_orchestration/` in order, or execute `00_run_full_pipeline.ipynb` for a full pipeline run.
+5. Develop locally, push to the remote repository, and pull changes in Databricks Repos.
+
+## Repository layout
 
 ```
 ecommerce-analytics/
@@ -21,169 +36,123 @@ ecommerce-analytics/
 │   ├── 02_spark_performance/
 │   ├── 03_silver_quality/
 │   ├── 04_joins_cdc/
-│   ├── 05_gold_analytics/        # window functions & gold metrics
-│   ├── 06_gold_observability/    # materialized views, extended gold, streaming, secure views
-│   ├── 07_dimensional/           # star schema
-│   ├── 08_delta_ops/             # Delta Lake optimization
+│   ├── 05_gold_analytics/
+│   ├── 06_gold_observability/
+│   ├── 07_dimensional/
+│   ├── 08_delta_ops/
 │   ├── 09_dbt/
-│   └── 10_orchestration/         # workflow tasks + runbook
-├── config/workflows/             # Databricks job JSON
-├── airflow/                      # local Airflow DAGs
-├── dashboard/                    # Lakeview SQL
-├── tests/                        # silver unit tests
+│   └── 10_orchestration/
+├── config/workflows/
+├── airflow/
+├── dashboard/
+├── tests/
 ├── dbt/
 └── src/
-    ├── ingestion/, quality/, transformations/
-    ├── spark_performance/, joins/, gold/
-    ├── gold_observability/, dimensional/, delta_ops/
-    └── orchestration/
 ```
 
----
-
-## Dataset
-
-Upload the 8 Olist CSVs to `/Volumes/globalmart/bronze/raw_landing/` after running `config/catalog_setup.sql`.
-
----
-
-## Databricks workflow
-
-1. Clone repo into **Databricks Repos**.
-2. Run `config/catalog_setup.sql`.
-3. Upload CSVs.
-4. Run notebooks **`01_bronze` → `10_orchestration`** in order (or **`00_run_full_pipeline`** for end-to-end).
-5. Edit on PC → `git push` → Databricks **Pull** (never Commit & Push from Databricks UI).
-
----
-
-## Notebooks by folder
+## Notebooks
 
 ### `01_bronze/` — ingestion
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_idempotent_ingestion.ipynb` | Batch load 8 CSVs with fingerprint idempotency |
-| `02_auto_loader_orders.ipynb` | Auto Loader for orders |
-| `03_nested_payments.ipynb` | Nested + flattened payments |
-| `04_schema_evolution.ipynb` | Schema evolution + violation log |
+| `01_idempotent_ingestion.ipynb` | Batch load with fingerprint-based idempotency |
+| `02_auto_loader_orders.ipynb` | Auto Loader ingestion for orders |
+| `03_nested_payments.ipynb` | Nested and flattened payment structures |
+| `04_schema_evolution.ipynb` | Schema evolution and violation logging |
 
-### `02_spark_performance/` — plans & optimization
-
-| Notebook | Purpose |
-|----------|---------|
-| `01_execution_plan_diagnostics.ipynb` | Predicate, join, shuffle anti-patterns |
-| `02_skew_detection.ipynb` | Skew analysis and remediation |
-| `03_higher_order_functions.ipynb` | Higher-order functions vs explode |
-
-### `03_silver_quality/` — cleaned entities
+### `02_spark_performance/` — Spark optimization
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_data_quality_dlq.ipynb` | DQ engine + dead letter queue |
-| `02_silver_orders.ipynb` | Silver orders + late arrivals + reconciliation |
-| `03_silver_order_items.ipynb` | Order items enrichment |
-| `04_silver_customers_sellers.ipynb` | Customers & sellers deduplication |
+| `01_execution_plan_diagnostics.ipynb` | Predicate, join, and shuffle diagnostics |
+| `02_skew_detection.ipynb` | Data skew analysis and remediation |
+| `03_higher_order_functions.ipynb` | Higher-order functions versus explode patterns |
 
-### `04_joins_cdc/` — joins & change data capture
+### `03_silver_quality/` — silver layer
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_business_join_questions.ipynb` | Four analytics queries + join justification |
+| `01_data_quality_dlq.ipynb` | Data quality rules and dead-letter queue |
+| `02_silver_orders.ipynb` | Orders, late arrivals, and reconciliation |
+| `03_silver_order_items.ipynb` | Order item enrichment |
+| `04_silver_customers_sellers.ipynb` | Customer and seller deduplication |
+
+### `04_joins_cdc/` — joins and CDC
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_business_join_questions.ipynb` | Business analytics queries with join rationale |
 | `02_broadcast_join_control.ipynb` | Join strategy comparison |
-| `03_skew_distribution_report.ipynb` | Top skewed keys report |
-| `04_cdc_customers_merge.ipynb` | CDC + Delta MERGE on customers |
+| `03_skew_distribution_report.ipynb` | Skew distribution reporting |
+| `04_cdc_customers_merge.ipynb` | Customer CDC with Delta MERGE |
 
-### `05_gold_analytics/` — window functions & gold metrics
-
-| Notebook | Purpose |
-|----------|---------|
-| `01_daily_sales_metrics.ipynb` | Daily revenue, cumulative totals, MAs, DoD, rank |
-| `02_customer_rfm.ipynb` | RFM quintiles and segments |
-| `03_category_growth_streaks.ipynb` | Consecutive month growth streaks |
-| `04_customer_summary_merge.ipynb` | Customer lifetime MERGE + soft delete |
-| `05_incremental_loader.ipynb` | Watermark incremental bronze → silver |
-
-### `06_gold_observability/` — extended gold & security *(run on Databricks)*
+### `05_gold_analytics/` — gold metrics
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_materialized_views.ipynb` | Regular vs materialized view timing |
-| `02_gold_aggregations.ipynb` | Daily summary (new/returning) + monthly seller performance |
-| `03_streaming_orders.ipynb` | Streaming-style orders table vs bronze count |
-| `04_dynamic_views.ipynb` | Column masking + row-level secure views |
+| `01_daily_sales_metrics.ipynb` | Daily revenue, moving averages, and rankings |
+| `02_customer_rfm.ipynb` | RFM segmentation |
+| `03_category_growth_streaks.ipynb` | Category growth streak analysis |
+| `04_customer_summary_merge.ipynb` | Customer lifetime summary with MERGE |
+| `05_incremental_loader.ipynb` | Watermark-based incremental loading |
 
-**Code:** `src/gold_observability/`
-
-### `07_dimensional/` — star schema
-
-| Notebook | Purpose |
-|----------|---------|
-| `01_date_dimension.ipynb` | Date dimension 2016–2020 |
-| `02_surrogate_key_strategy.ipynb` | SK strategy comparison |
-| `03_product_dimension.ipynb` | Product SCD Type 1 |
-| `04_seller_dimension.ipynb` | Seller SCD Type 1 |
-| `05_customer_dimension_scd2.ipynb` | Customer SCD Type 2 |
-| `06_fact_sales.ipynb` | Fact table + validations |
-| `07_star_schema_query.ipynb` | Multi-dimension analytics query |
-
-### `08_delta_ops/` — Delta Lake
+### `06_gold_observability/` — observability and security
 
 | Notebook | Purpose |
 |----------|---------|
-| `01_small_files_optimize.ipynb` | Small files + OPTIMIZE |
-| `02_partition_zorder.ipynb` | Partition + Z-ORDER |
-| `03_vacuum.ipynb` | VACUUM dry run + execute |
-| `04_time_travel.ipynb` | Time travel + RESTORE |
-| `05_liquid_clustering.ipynb` | Liquid clustering comparison |
+| `01_materialized_views.ipynb` | View materialization performance |
+| `02_gold_aggregations.ipynb` | Daily and monthly gold aggregations |
+| `03_streaming_orders.ipynb` | Streaming orders table |
+| `04_dynamic_views.ipynb` | Column masking and row-level security |
 
-### `09_dbt/` + `dbt/` — dbt on Databricks
+Supporting modules: `src/gold_observability/`
+
+### `07_dimensional/` — dimensional model
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_date_dimension.ipynb` | Date dimension |
+| `02_surrogate_key_strategy.ipynb` | Surrogate key strategy comparison |
+| `03_product_dimension.ipynb` | Product dimension (SCD Type 1) |
+| `04_seller_dimension.ipynb` | Seller dimension (SCD Type 1) |
+| `05_customer_dimension_scd2.ipynb` | Customer dimension (SCD Type 2) |
+| `06_fact_sales.ipynb` | Sales fact table and validation |
+| `07_star_schema_query.ipynb` | Multi-dimensional analytics query |
+
+### `08_delta_ops/` — Delta Lake operations
+
+| Notebook | Purpose |
+|----------|---------|
+| `01_small_files_optimize.ipynb` | Small-file compaction and OPTIMIZE |
+| `02_partition_zorder.ipynb` | Partitioning and Z-ORDER |
+| `03_vacuum.ipynb` | VACUUM execution |
+| `04_time_travel.ipynb` | Time travel and RESTORE |
+| `05_liquid_clustering.ipynb` | Liquid clustering evaluation |
+
+### `09_dbt/` — dbt transformations
 
 | Item | Purpose |
 |------|---------|
-| `dbt/` | Staging, marts, incremental fact, snapshot, tests |
-| `01_dbt_setup_and_run.ipynb` | Install, debug, run, test, snapshot |
+| `dbt/` | Staging models, marts, incremental fact, snapshots, and tests |
+| `01_dbt_setup_and_run.ipynb` | dbt installation, execution, and testing |
 
-Requires `gold.dim_*` tables from `07_dimensional/` for the incremental fact model.
+The incremental fact model requires dimensional tables from `07_dimensional/`.
 
 ### `10_orchestration/` — pipeline orchestration
 
 | Notebook | Purpose |
 |----------|---------|
-| `00_run_full_pipeline.ipynb` | **Recommended (Free Edition)** — runs `01`–`07` sequentially |
-| `01_bronze_ingestion.ipynb` | Idempotent bronze load |
-| `02_quality_checks.ipynb` | DQ on `bronze.orders` |
-| `03_silver_transforms.ipynb` | Silver entities + DLQ gate |
-| `04_reconciliation.ipynb` | Bronze vs silver reconciliation |
-| `05_gold_aggregations.ipynb` | Daily summary + seller performance |
-| `06_dimensional_refresh.ipynb` | Star schema rebuild |
-| `07_visualization.ipynb` | Dashboard datasets + star query |
-| `08_workflow_runbook.ipynb` | Free Edition notes + optional Workflow job |
+| `00_run_full_pipeline.ipynb` | End-to-end pipeline runner |
+| `01_bronze_ingestion.ipynb` | Bronze ingestion task |
+| `02_quality_checks.ipynb` | Bronze data quality checks |
+| `03_silver_transforms.ipynb` | Silver transformations |
+| `04_reconciliation.ipynb` | Bronze-to-silver reconciliation |
+| `05_gold_aggregations.ipynb` | Gold aggregation refresh |
+| `06_dimensional_refresh.ipynb` | Dimensional model refresh |
+| `07_visualization.ipynb` | Dashboard dataset preparation |
+| `08_workflow_runbook.ipynb` | Workflow deployment notes |
 
-**Also:** `config/workflows/globalmart_pipeline.job.json` · `airflow/` · `tests/` · [`dashboard/`](dashboard/)
+Additional assets: `config/workflows/globalmart_pipeline.job.json`, `airflow/`, `tests/`, and [`dashboard/`](dashboard/).
 
-**Code:** `src/orchestration/`
-
----
-
-## Architecture
-
-```text
-Bronze → Silver → Gold → Observability → Dimensional → Delta ops → dbt → Orchestration
-```
-
-JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
-
----
-
-## Project completion checklist
-
-| # | Deliverable | Where | Status |
-|---|-------------|-------|--------|
-| 1 | All notebook phases `01`–`10` | Databricks | **Done** |
-| 2 | End-to-end orchestration | `00_run_full_pipeline` run `f704199a-…` | **Done** |
-| 3 | Lakeview dashboard (5 charts) | [`dashboard/README.md`](dashboard/README.md) | **You** — ~15 min on Databricks |
-| 4 | `dbt test` all passing | `09_dbt/01` last cells | **You** — ~5 min on Databricks |
-| 5 | Final reflection (300–500 words) | Assignment submission | **You** — write locally |
-| — | Airflow / unit tests | `airflow/`, `tests/` | Optional (skip on Free Edition) |
-| — | Failure demo screenshot | Re-run `00` with `simulate_failure=silver_transforms` | Optional |
+Supporting modules: `src/orchestration/`
