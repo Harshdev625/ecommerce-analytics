@@ -32,6 +32,8 @@ dbt snapshot --target dev
 
 Or run `notebooks/09_dbt/01_dbt_setup_and_run.ipynb` on Databricks.
 
+**Sign-off:** run `dbt test --target dev` and record results in [`Result.md`](../Result.md#dbt).
+
 ## Output schemas (dev target)
 
 | Layer | Schema |

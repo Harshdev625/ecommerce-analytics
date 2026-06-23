@@ -593,7 +593,11 @@ Built by `dbt run` / `dbt test` in notebook:
 | Macro | `normalize_city` / `normalize_state` (customers + sellers) |
 | Tests | Schema tests + `assert_delivered_orders_positive_revenue` |
 
-Incremental fact + snapshot verified on Databricks; confirm `dbt test` output for full test suite sign-off.
+Incremental fact + snapshot verified on Databricks. **Run `dbt test`** in `09_dbt/01` and paste output below when complete:
+
+```text
+dbt test — pending sign-off
+```
 
 ---
 
@@ -713,7 +717,9 @@ Views created successfully on Databricks. **Verified.**
 | `07_visualization` | **Verified** |
 | `00_run_full_pipeline` | **Verified** (end-to-end, Free Edition) |
 | Databricks Workflow job | Skipped (Free Edition — `00` used instead) |
-| Airflow / unit tests / Lakeview | Pending |
+| Lakeview dashboard UI | **Pending** — see [`dashboard/README.md`](dashboard/README.md) |
+| `dbt test` full suite | **Pending** — run `09_dbt/01` test cell |
+| Airflow / unit tests | Optional (local PC) |
 
 ### Bronze ingestion
 
@@ -810,8 +816,29 @@ On Free Edition, `00_run_full_pipeline.ipynb` replaces a multi-task Workflow job
 
 ---
 
-## Not yet built
+## Project completion checklist
 
-| Area | Planned work |
-|------|----------------|
-| *(none — pipeline code complete)* | Final reflection essay (assignment) |
+| # | Deliverable | Status |
+|---|-------------|--------|
+| 1 | Phases `01_bronze` – `10_orchestration` notebooks on Databricks | **Done** |
+| 2 | `06_gold_observability` (materialized views, streaming, secure views) | **Done** |
+| 3 | `07_dimensional` star schema — `fact_sales` **110,197** rows | **Done** |
+| 4 | `08_delta_ops` (OPTIMIZE, VACUUM, time travel, liquid clustering) | **Done** |
+| 5 | `09_dbt` debug, freshness, incremental fact, snapshot | **Done** |
+| 6 | `00_run_full_pipeline` end-to-end (`f704199a-…`, 7/7 SUCCESS) | **Done** |
+| 7 | Lakeview dashboard — 5 charts from `dashboard/lakeview_queries.sql` | **Pending** |
+| 8 | `dbt test` — full suite in `09_dbt/01` | **Pending** |
+| 9 | Final reflection essay (300–500 words) | **Pending** (assignment) |
+| — | Airflow, unit tests, Workflow job, failure demo | Optional |
+
+### Key metrics (verified)
+
+| Metric | Value |
+|--------|-------|
+| Bronze orders (base) | **99,441** (+ 500 schema-evolution rows) |
+| Silver order items | **112,650** |
+| `gold.fact_sales` | **110,197** · **R$15,419,773.75** |
+| Pipeline reconciliation | **all_passed: true** |
+| dbt incremental fact idempotent | **110,197** = **110,197** |
+
+Reports: `/Volumes/globalmart/metadata/run_reports/`

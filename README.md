@@ -2,8 +2,8 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Phases `01`–`10` orchestration verified on Databricks · Lakeview dashboard + `dbt test` pending  
-**Run results:** [`Result.md`](Result.md)
+**Pipeline status:** Phases `01`–`10` verified on Databricks Free Edition · **2 items left:** Lakeview dashboard + `dbt test`  
+**Run results:** [`Result.md`](Result.md) · **Dashboard guide:** [`dashboard/README.md`](dashboard/README.md)
 
 ---
 
@@ -52,7 +52,7 @@ Upload the 8 Olist CSVs to `/Volumes/globalmart/bronze/raw_landing/` after runni
 1. Clone repo into **Databricks Repos**.
 2. Run `config/catalog_setup.sql`.
 3. Upload CSVs.
-4. Run notebooks **`01_bronze` → `09_dbt`** in order (see sections below).
+4. Run notebooks **`01_bronze` → `10_orchestration`** in order (or **`00_run_full_pipeline`** for end-to-end).
 5. Edit on PC → `git push` → Databricks **Pull** (never Commit & Push from Databricks UI).
 
 ---
@@ -146,10 +146,11 @@ Upload the 8 Olist CSVs to `/Volumes/globalmart/bronze/raw_landing/` after runni
 
 Requires `gold.dim_*` tables from `07_dimensional/` for the incremental fact model.
 
-### `10_orchestration/` — pipeline orchestration *(run on Databricks)*
+### `10_orchestration/` — pipeline orchestration
 
-| Notebook | Workflow task |
-|----------|----------------|
+| Notebook | Purpose |
+|----------|---------|
+| `00_run_full_pipeline.ipynb` | **Recommended (Free Edition)** — runs `01`–`07` sequentially |
 | `01_bronze_ingestion.ipynb` | Idempotent bronze load |
 | `02_quality_checks.ipynb` | DQ on `bronze.orders` |
 | `03_silver_transforms.ipynb` | Silver entities + DLQ gate |
@@ -157,9 +158,9 @@ Requires `gold.dim_*` tables from `07_dimensional/` for the incremental fact mod
 | `05_gold_aggregations.ipynb` | Daily summary + seller performance |
 | `06_dimensional_refresh.ipynb` | Star schema rebuild |
 | `07_visualization.ipynb` | Dashboard datasets + star query |
-| `08_workflow_runbook.ipynb` | Job setup + failure demo |
+| `08_workflow_runbook.ipynb` | Free Edition notes + optional Workflow job |
 
-**Also:** `config/workflows/globalmart_pipeline.job.json` · `airflow/` · `tests/` · `dashboard/lakeview_queries.sql`
+**Also:** `config/workflows/globalmart_pipeline.job.json` · `airflow/` · `tests/` · [`dashboard/`](dashboard/)
 
 **Code:** `src/orchestration/`
 
@@ -175,12 +176,14 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 ---
 
-## What's next
+## Project completion checklist
 
-| Area | Work |
-|------|------|
-| Lakeview | Publish dashboard from `dashboard/lakeview_queries.sql` |
-| dbt | Confirm `dbt test` in `09_dbt/01` |
-| Optional | Failure demo on `00` (`simulate_failure=silver_transforms`) |
-| Optional | Local unit tests / Airflow (`airflow/README.md`) |
-| Assignment | Final reflection essay |
+| # | Deliverable | Where | Status |
+|---|-------------|-------|--------|
+| 1 | All notebook phases `01`–`10` | Databricks | **Done** |
+| 2 | End-to-end orchestration | `00_run_full_pipeline` run `f704199a-…` | **Done** |
+| 3 | Lakeview dashboard (5 charts) | [`dashboard/README.md`](dashboard/README.md) | **You** — ~15 min on Databricks |
+| 4 | `dbt test` all passing | `09_dbt/01` last cells | **You** — ~5 min on Databricks |
+| 5 | Final reflection (300–500 words) | Assignment submission | **You** — write locally |
+| — | Airflow / unit tests | `airflow/`, `tests/` | Optional (skip on Free Edition) |
+| — | Failure demo screenshot | Re-run `00` with `simulate_failure=silver_transforms` | Optional |
