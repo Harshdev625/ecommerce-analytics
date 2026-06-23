@@ -699,33 +699,105 @@ Views created successfully on Databricks. **Verified.**
 
 ## Orchestration
 
-**Folder:** `10_orchestration/` · **Code:** `src/orchestration/` · **Workflow:** `config/workflows/globalmart_pipeline.job.json`
+**Folder:** `10_orchestration/` · **Code:** `src/orchestration/` · **Workflow:** `config/workflows/globalmart_pipeline.job.json`  
+**Workspace path:** `/Workspace/Users/devh9933@gmail.com/ecommerce-analytics`
 
-| Component | Status |
-|-----------|--------|
-| 7 parameterized pipeline notebooks | **Ready** — run via Databricks Workflow |
-| Workflow JSON (bronze → visualization) | **Ready** — replace `<REPO_PATH>` |
-| Airflow DAGs (`airflow/dags/`) | **Ready** — local setup in `airflow/README.md` |
-| Unit tests (`tests/test_silver_transformations.py`) | **Ready** — run locally with PySpark |
-| Lakeview SQL (`dashboard/lakeview_queries.sql`) | **Ready** — publish dashboard in UI |
+| Notebook / task | Status |
+|-----------------|--------|
+| `01_bronze_ingestion` | **Verified** |
+| `02_quality_checks` | **Verified** |
+| `03_silver_transforms` | **Verified** |
+| `04_reconciliation` | **Verified** |
+| `05_gold_aggregations` | **Verified** |
+| `06_dimensional_refresh` | **Verified** |
+| `07_visualization` | Run after `total_amount` SQL fix |
+| Databricks Workflow job | Pending |
+| Airflow / unit tests / Lakeview | Pending |
 
-### Pipeline tasks
+### Bronze ingestion
 
-| Task key | Notebook | Depends on |
-|----------|----------|------------|
-| `bronze_ingestion` | `01_bronze_ingestion` | — |
-| `quality_checks` | `02_quality_checks` | bronze |
-| `silver_transforms` | `03_silver_transforms` | quality |
-| `reconciliation` | `04_reconciliation` | silver |
-| `gold_aggregations` | `05_gold_aggregations` | silver (parallel) |
-| `dimensional_refresh` | `06_dimensional_refresh` | reconciliation + gold |
-| `visualization` | `07_visualization` | dimensional |
+**Report:** `pipeline_bronze_ingestion.json`
 
-**Widgets:** `pipeline_run_id`, `dry_run`, `simulate_failure` (task key to demo downstream skips).
+| Metric | Value |
+|--------|-------|
+| Status | **SUCCESS** |
+| Files processed | **9** |
+| Ingested | **0** (idempotent) |
+| Skipped | **9** (8 core CSVs + optional geolocation) |
 
-**Reports:** `/Volumes/globalmart/metadata/run_reports/pipeline_*.json`
+### Quality checks
 
-*Pending: successful workflow run + failure demo + Airflow trigger + `dbt test` sign-off documented here.*
+**Report:** `pipeline_quality_checks.json` · **Table:** `bronze.orders`
+
+| Metric | Value |
+|--------|-------|
+| Overall status | **PASSED** |
+| Critical rules | **6/6** passed |
+| Failed rules | none |
+
+### Silver transforms
+
+**Report:** `pipeline_silver_transforms.json`
+
+| Table | Rows |
+|-------|------|
+| `silver.orders` (on_time) | **0** |
+| `silver.orders_late_arrivals` | **99,441** |
+| `silver.order_items` | **112,650** |
+| `silver.customers` | **99,441** |
+| `silver.sellers` | **3,095** |
+
+Historical orders vs recent `_ingested_at` classify as `very_late`; downstream `load_all_orders()` unions both tables for gold/dimensional.
+
+### Reconciliation
+
+**Report:** `pipeline_reconciliation.json` · **Target:** `silver.orders_combined` (on_time ∪ late_arrivals)
+
+| Level | Result |
+|-------|--------|
+| LEVEL_1_COUNT | **passed** — 99,441 = 99,441 |
+| LEVEL_2_BUCKET_HASH | **passed** — 0 mismatched buckets |
+| LEVEL_3_DRILL_DOWN | **passed** — 0 diff keys |
+| `all_passed` | **true** |
+
+### Gold aggregations
+
+**Report:** `pipeline_gold_aggregations.json`
+
+| Table | Rows |
+|-------|------|
+| `gold.daily_sales_summary` | **612** (validation 0 failures) |
+| `gold.seller_performance_monthly` | **16,068** |
+
+### Dimensional refresh
+
+**Report:** `pipeline_dimensional_refresh.json`
+
+| Object | Rows / result |
+|--------|----------------|
+| `gold.dim_date` | **1,827** |
+| `gold.dim_product` | **32,951** |
+| `gold.dim_seller` | **3,095** |
+| `gold.dim_customer` (current) | **99,441** (6 SCD2 versions demo) |
+| `gold.fact_sales` | **110,197** · revenue **R$15,419,773.75** · all validations **passed** |
+
+### Visualization
+
+**Report:** `pipeline_visualization.json` · Uses `fact_sales.total_amount` for dashboard datasets. Re-run `07_visualization.ipynb` after Pull if not yet successful.
+
+### Workflow job (pending)
+
+| Task key | Depends on |
+|----------|------------|
+| `bronze_ingestion` | — |
+| `quality_checks` | bronze |
+| `silver_transforms` | quality |
+| `reconciliation` | silver |
+| `gold_aggregations` | silver (parallel) |
+| `dimensional_refresh` | reconciliation + gold |
+| `visualization` | dimensional |
+
+**Widgets:** `pipeline_run_id`, `dry_run`, `simulate_failure`
 
 ---
 

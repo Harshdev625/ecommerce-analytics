@@ -2,7 +2,7 @@
 
 Medallion data pipeline on **Databricks** for the [Olist Brazilian E-Commerce](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) dataset.
 
-**Pipeline status:** Phases `01`–`09` complete · Phase `10_orchestration` ready to run on Databricks  
+**Pipeline status:** Phases `01`–`09` complete · Phase `10_orchestration` notebooks verified on Databricks (workflow + dashboard pending)  
 **Run results:** [`Result.md`](Result.md)
 
 ---
@@ -179,8 +179,10 @@ JSON run summaries: `/Volumes/globalmart/metadata/run_reports/`
 
 | Area | Work |
 |------|------|
-| Orchestration | Create Databricks Workflow from `config/workflows/`, run `10_orchestration/` notebooks |
-| Airflow | Local `airflow standalone` + trigger job (see `airflow/README.md`) |
-| Unit tests | `pip install -r tests/requirements.txt` then `python -m unittest tests.test_silver_transformations` |
-| Dashboard | Publish Lakeview dashboard from `dashboard/lakeview_queries.sql` |
-| dbt | Confirm `dbt test` passes; document in `Result.md` |
+| Visualization | Re-run `10_orchestration/07_visualization` after Pull (if not done) |
+| Workflow job | Create + run full job from `config/workflows/globalmart_pipeline.job.json` |
+| Failure demo | Job parameter `simulate_failure=silver_transforms` |
+| Lakeview | Publish dashboard from `dashboard/lakeview_queries.sql` |
+| dbt | Confirm `dbt test` in `09_dbt/01` |
+| Local (optional) | Unit tests (`tests/`), Airflow (`airflow/README.md`) |
+| Assignment | Final reflection essay (300–500 words) |
